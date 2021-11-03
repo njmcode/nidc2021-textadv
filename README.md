@@ -855,7 +855,7 @@ body[data-location="field"] {
   color: skyblue;
 }
 
-/* etc *
+/* etc */
 ```
 
 ### Dark areas
