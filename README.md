@@ -1053,21 +1053,21 @@ const someEntity = (getThis) => {
       game.COMMANDS
 
       // Increments the turn counter
-      game.doTurn();
+      game.doTurn()
 
       // Immediately ends the game (WIP)
       game.end()
 
       // Returns the given 'live' entity object
-      const entity = game.entity(entityId);
-      entity.data;
-      entity.exists;
-      entity.is(entityId);
-      entity.meta.visitCount;
+      const entity = game.entity(entityId)
+      entity.data
+      entity.exists
+      entity.is(entityId)
+      entity.meta.visitCount
       // Entity arrays are converted to Sets by the engine.
       // Use Set methods (add, has, delete) to manipulate the following
-      entity.tags;
-      entity.things;
+      entity.tags
+      entity.things
 
       // Visits the given entity as a location
       game.goTo(entityId, skipTurn = false)
@@ -1088,7 +1088,7 @@ const someEntity = (getThis) => {
       // Output game text
       game.print(textFuncOrArray, cssClass)
 
-      // Current turn count of game (nutable)
+      // Turn count of game (mutable)
       game.state.turnCount
 
       // An object of tag consts
