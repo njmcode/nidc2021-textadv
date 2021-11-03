@@ -3,47 +3,35 @@ import Engine from '..';
 import 'normalize.css';
 import './index.scss';
 
-const jail = () => ({
-  id: 'jail',
-  summary: 'A filty jail.',
-  description: 'This dingy, filth-encrusted jail has seen many rot away over the years.',
-  things: ['sharuga']
-});
-
-const sharuga = () => ({
-  id: 'sharuga',
-  nouns: ['sharuga', 'barbarian', 'woman', 'prisoner'],
-  tags: ['fixed'],
-  summary: 'Sharuga',
-  description: 'An imposing yet strangely elegant warrior woman with red facial tattoos.',
-  data: {
-    quotes: [
-      'Do you have any grog?',
-      'When I get out of here...',
-      'Oh, the ladies of Waterdeep...',
-      '...f*** my life.'
-    ]
+const pub = () => ({
+  id: 'pub',
+  summary: 'A cosy pub.',
+  description: 'This firelit drinking den is empty of people. A cellar door leads downstairs. The kitchen is east.',
+  to: {
+    down: 'cellar',
+    e: 'kitchen'
   }
 });
 
-const newGame = new Engine({
-  entities: [jail, sharuga],
-  commands: {
-    talk: ['talk to', 'ask', 'chat with']
-  },
-  onCommand: ({
-    game, command, subject, stopCommand
-  }) => {
-    // Make any entity with data.quotes say
-    // something random when asked
-    if (command.talk && subject.exists && subject.data.quotes) {
-      const rndQuote = subject.data.quotes[
-        Math.floor(Math.random() * subject.data.quotes.length)
-      ];
-      game.print(`${subject.summary} says, "${rndQuote}"`);
-      stopCommand();
-    }
+const cellar = () => ({
+  id: 'cellar',
+  summary: 'A musty wine cellar.',
+  description: 'In the gloom and dust, you can make out rack upon rack of wine bottles. Firelight glows from an overhead hatch.',
+  to: {
+    up: 'pub'
   }
 });
 
-newGame.start();
+const kitchen = () => ({
+  id: 'kitchen',
+  summary: 'A well-stocked kitchen.',
+  description: 'The shelves of the small kitchen are almost bursting with fresh meat and produce. The west door leads to the pub.',
+  to: {
+    w: 'pub'
+  }
+});
+
+const myGame = new Engine({
+  entities: [pub, cellar, kitchen]
+});
+myGame.start();
