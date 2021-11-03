@@ -750,7 +750,7 @@ const storeroom = () => ({
   id: 'storeroom',
   summary: 'A small storage area.',
   description: 'A claustrophobic back room used for storage and book-keeping.',
-  things: ['tenCoinsAdder']
+  things: ['coinAdder']
 });
 
 const newGame = new Engine({
