@@ -120,7 +120,7 @@ const newGame = new Engine({
     pull: ['pull', 'remove', 'tamper', 'disconnect', 'yank', 'tear'],
     defuse: ['defuse', 'stop', 'disarm', 'disable'],
     cut: ['cut', 'snip', 'sever'],
-    force: ['force', 'open', 'pry', 'jam', 'hit', 'kick', 'smash', 'break']
+    force: ['force', 'open', 'force open', 'pry open', 'pry', 'jam', 'hit', 'kick', 'smash', 'break']
   },
   onTurn: ({ game }) => {
     // Bomb timer
