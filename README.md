@@ -260,7 +260,7 @@ The engine has no built-in commands or logic for making items useful. However, t
 
 ### Location triggers
 
-A simple example is to make something happen if the player enters a location in possession of a certain item. The location's `onLocationVisit` callback can be used to make checks and changes to the game.
+A simple example is to make something happen if the player enters a location in possession of a certain item. A location's `onGoTo` callback can be used to perform logic when the player moves around.
 
 ```javascript
 const entryway = () => ({
@@ -275,7 +275,7 @@ const entryway = () => ({
 
 const idol = () => ({
   id: 'idol',
-  noun: ['idol', 'statue', 'totem'],
+  nouns: ['idol', 'statue', 'totem'],
   summary: 'a small statue',
   description: 'The statue is well-worn, but radiates a calming, protective aura.'
 });
@@ -283,18 +283,22 @@ const idol = () => ({
 const temple = () => ({
   id: 'temple',
   summary: 'A foreboding, ruined temple.',
-  description: 'Within the crumbling chamber, the floor rattles under your feet. A mural on the far wall depicts a large snake, almost staring at you. The exit is south.'
+  description: 'Within the crumbling chamber, the floor rattles under your feet. A mural on the far wall depicts a large snake, almost staring at you. The exit is south.',
   to: {
     s: 'entryway'
   },
-  onLocationVisit: ({ game }) => {
-    // 'Kill' the player if they enter the
-    // temple while not holding the idol
-    if (!game.inventory.has('idol')) {
-      game.print('The floor crumbles beneath you, sending you crashing to the bottom of a deep pit. Smothered in agony and darkness, you feel the slithery bodies of a hundred poisonous snakes envelop your body. Your adventure ends here.');
+  onGoTo: ({ game, afterGoTo }) => {
+    // Using the afterGoTo callback lets the
+    // location describe itself as normal first
+    afterGoTo(() => {
+      // 'Kill' the player if they enter the
+      // temple while not holding the idol
+      if (!game.inventory.has('idol')) {
+        game.print('The floor crumbles beneath you, sending you crashing to the bottom of a deep pit. Smothered in agony and darkness, you feel the slithery bodies of a hundred poisonous snakes envelop your body. Your adventure ends here.');
 
-      game.end();
-    }
+        game.end();
+      }
+    });
   }
 });
 
@@ -706,13 +710,13 @@ const newGame = new Engine({
   entities: [basement, timeBomb],
   onTurn: ({ game }) => {
     const bomb = game.entity('timeBomb');
-    bomb.data.remaining -= 1;
 
     if (bomb.data.remaining === 0) {
       game.print('The bomb explodes, blowing you and the entire building to smithereens. Game Over.');
       game.end();
     } else {
       game.print('The bomb continues to tick...');
+      bomb.data.remaining -= 1;
     }
   }
 });
@@ -819,7 +823,7 @@ const newGame = new Engine({
 newGame.start();
 ```
 
-```
+```text
 > INVENTORY
 
 You are carrying nothing.
@@ -832,19 +836,21 @@ As good-looking as ever.
 ### Per-location aesthetics
 
 ```javascript
-// Use the *global* onLocationVisit callback (which is called
+// Use the *global* onGoTo callback (which is called
 // before any location-specific ones) to add a hook for CSS
 // to target.
 
 const newGame = new Engine({
   // ...
-  onLocationVisit: ({ here }) => {
-    // 'here' = current location entity
-    document.querySelector('body').dataset.location = here.id;
+  onGoTo: ({ game, afterGoTo }) => {
+    afterGoTo(() => {
+      document.querySelector('body').dataset.location = game.location.id;
+    });
   },
   // ...
 }).start();
 ```
+
 ```css
 body[data-location="dungeon"] {
   background-color: #113;
@@ -885,20 +891,22 @@ const kitchen = () => ({
 // Utility function to list all 'to' commands
 // in the current location
 const reportExits = (game) => {
-  if (game.location.to) {
-    const exitList = Object.keys(game.location.to)
-      .map((k) => k.toUpperCase())
-      .join(', ');
+  if (!game.location.to) return;
 
-    game.print(`Exits are: ${exitList}.`);
-  }
+  const exitList = Object.keys(game.location.to)
+    .map((k) => k.toUpperCase())
+    .join(', ');
+
+  game.print(`Exits are: ${exitList}.`);
 };
 
 const myGame = new Engine({
   entities: [pub, cellar, kitchen],
   // List exits when visiting location
-  onLocationVisit: ({ game }) => {
-    reportExits(game);
+  onGoTo: ({ game, afterGoTo }) => {
+    afterGoto(() => {
+      reportExits(game);
+    }
   },
   // List exits when LOOKing
   onCommand: ({ game, command, afterCommand }) => {
@@ -1037,7 +1045,7 @@ const someEntity = (getThis) => {
   /**
    * getThis() - [function]
    * Can be called within this entity to return a 'live' reference to itself.
-   * See the docs for game.entity() in 'onLocationVisit' below.
+   * See the docs for game.entity() in 'onGoTo' below.
   **/
 
   // Entity functions must return an object.
@@ -1100,11 +1108,11 @@ const someEntity = (getThis) => {
     // array usage not recommended here for items.
     summary: 'This is a summary',
 
-    // Locations will trigger this callback every time
-    // they are visited via navigation or game.goTo().
-    onLocationVisit: ({ game, here }) => {
+    // Locations will trigger this callback every time,
+    // *just before* they are visited via navigation
+    // or game.goTo().
+    onGoTo: ({ game, stopChange, afterChange }) => {
       // 'game' is the game instance
-      // 'here' is an alias for game.location
 
       // Aliases (synonyms) for the base COMMANDS
       game.ALIASES
@@ -1137,6 +1145,9 @@ const someEntity = (getThis) => {
       game.inventory
 
       // Points to the current location entity
+      // (i.e. the location being moved *FROM*, not this one).
+      // If read inside the 'afterGoTo' callback,
+      // will point to this one.
       game.location
 
       // Prints the current location's description / summary
@@ -1153,6 +1164,19 @@ const someEntity = (getThis) => {
 
       // An object of tag consts
       game.TAGS
+
+      // Prevents the location change from being executed.
+      // See noTurn() below for suppressTurn behaviour.
+      stopGoTo(suppressTurn = false);
+
+      // Calls the provided function after the location
+      // change has been executed
+      afterGoTo(callbackFn);
+
+      // If called, prevents the turn count from being
+      // incremented and the onTurn global callback firing
+      // for this location change.
+      noTurn();
     }
   }
 };
@@ -1227,9 +1251,11 @@ const newGame = new Engine({
     // ...
   },
 
-  // As for entity.onLocationVisit, but is called on *every*
-  // location change, before the location's logic (if present).
-  onLocationVisit: ({ game, here }) => {
+  // As for entity.onGoTo, but is called on *every*
+  // location change, before the logic of the location
+  // being moved to.
+  onGoTo: ({ game, destination, stopGoto, afterGoTo }) => {
+    // 'destination' is the entity being moved to
     // ...
   }
 });
@@ -1242,7 +1268,9 @@ newGame.start();
 
 - [ ] Bug: 'me' not recognizable as noun (compromise config issue)
 - [ ] Proper game.end() behaviour
-- [ ] game.wait()
+- [ ] game.pause()
+- [ ] 'wait' command
 - [ ] 'it' usage
 - [ ] 'and' + other separator usage
 - [ ] Command history + clear
+- [ ] Utility functions (rnd in array, print list, etc)

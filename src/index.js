@@ -223,7 +223,9 @@ class Engine {
     });
 
     this.els.output.innerHTML = '';
-    this.goTo(this.config.startLocationId || this._defaultStartId, true);
+    this.state.currentLocationId = this.config.startLocationId || this._defaultStartId;
+    // Trigger any state logic in the first location
+    this.goTo(this.state.currentLocationId, true);
   };
 
   get location() {
@@ -235,7 +237,7 @@ class Engine {
   }
 
   look = (forceFullDescription = false) => {
-    if (forceFullDescription || !this.location.meta.isRead) {
+    if (forceFullDescription || this.location.meta.visitCount === 1) {
       this.print(this.location.description);
     } else {
       this.print(this.location.summary);
@@ -494,19 +496,44 @@ class Engine {
       throw new Error(`goTo(): unknown entity ID '${locationId}'`);
     }
 
+    const destination = this.entity(locationId);
+
+    let _shouldStopChange = false;
+    let _afterLocationChangeCallback = null;
+
+    const stopGoTo = () => {
+      _shouldStopChange = true;
+    };
+
+    const afterGoTo = (cb) => {
+      _afterLocationChangeCallback = cb;
+    };
+
+    if (typeof this.config.onGoTo === 'function') {
+      this.config.onGoTo({
+        game: this, destination, stopGoTo, afterGoTo
+      });
+    }
+
+    // FIXME: turn tracking may not be intuitive here
+
+    if (!this.state.isActive || _shouldStopChange) return;
+
+    if (typeof destination.onGoTo === 'function') {
+      destination.onGoTo({
+        game: this, stopGoTo, afterGoTo
+      });
+    }
+
+    if (!this.state.isActive || _shouldStopChange) return;
+
     this.state.currentLocationId = locationId;
     this.location.meta.visitCount += 1;
     this.look();
     if (!skipTurn) this.doTurn();
 
-    if (typeof this.config.onLocationVisit === 'function') {
-      this.config.onLocationVisit({ game: this, here: this.location });
-    }
-
-    if (!this.state.isActive) return;
-
-    if (typeof this.location.onLocationVisit === 'function') {
-      this.location.onLocationVisit({ game: this, here: this.location });
+    if (typeof _afterLocationChangeCallback === 'function') {
+      _afterLocationChangeCallback();
     }
   };
 
