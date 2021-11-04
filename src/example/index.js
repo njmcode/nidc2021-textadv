@@ -9,6 +9,7 @@ const pub = () => ({
   id: 'pub',
   summary: 'A cosy pub.',
   description: 'This firelit drinking den is empty of people. A cellar door leads downstairs. The kitchen is east.',
+  things: ['owlHelmet'],
   to: {
     down: 'cellar',
     e: 'kitchen'
@@ -18,11 +19,24 @@ const pub = () => ({
 const cellar = () => ({
   id: 'cellar',
   summary: 'A musty wine cellar.',
-  description: 'In the gloom and dust, you can make out rack upon rack of wine bottles. Firelight glows from an overhead hatch. To the east there is a mysterious locked door with an unusually shaped key hole.',
+  description: 'In the gloom and dust, you can make out rack upon rack of wine bottles. Firelight glows from an overhead hatch.',
+  things: ['mysteriousDoor'],
   to: {
     up: 'pub',
     e: 'mysteriousRoom'
   }
+});
+
+const mysteriousDoor = (getThis) => ({
+  id: 'mysteriousDoor',
+  nouns: ['mysterious door', 'locked door', 'door'],
+  summary: 'A mysterious door with an unusually shaped key hole.',
+  data: {
+    condition: 'locked' // e.g. could be 'cracked' later
+  },
+  // Text using getThis() *must* be declared as a function
+  description: () =>
+    `A mysterious door. You see no physical threat but you find yourself alarmed by an unseen presence. It is ${getThis().data.condition}.`
 });
 
 const mysteriousRoom = () => ({
@@ -31,7 +45,19 @@ const mysteriousRoom = () => ({
   data: {
     hasOwlHelmet: false
   },
-  description: this.data.hasOwlHelmet ? 'This room is eerily neat and well decorated.' : 'Before you can discover what is in the room, you are overcome with chills and an extremely unsettling feeling, the likes of which you have never felt. Your mind is bombarded by quick mental flashes of strangers suffering, more rapid which each passing second. You feel as if you\'re body, instinctively, needs to get away. You can not focus.',
+  description: 'Before you can discover what is in the room, you are overcome with chills and an extremely unsettling feeling, the likes of which you have never felt. Your mind is bombarded by quick mental flashes of strangers suffering, more rapid which each passing second. You feel as if you\'re body, instinctively, needs to get away. You can not focus.',
+  to: {
+    w: 'cellar'
+  }
+});
+
+const castellansSecretChamber = () => ({
+  id: 'castellansSecretChamber',
+  summary: 'A mysterious room, to be sure.',
+  data: {
+    hasOwlHelmet: false
+  },
+  description: 'This room is eerily neat and well decorated.',
   to: {
     w: 'cellar'
   }
@@ -42,6 +68,13 @@ const goldRing = () => ({
   nouns: ['gold ring', 'ring', 'owl ring', 'mysterious ring', 'ring key', 'key ring'],
   summary: 'a gold ring',
   description: 'It is unusually shaped, as if it could fit into something. You wipe the blood off and notice a mysterious emblem of an owl head with tentacles.',
+});
+
+const owlHelmet = () => ({
+  id: 'owlHelmet',
+  nouns: ['owl helmet', 'helmet'],
+  summary: 'an Owl Helmet',
+  description: 'An Owl Helemt. Shaped like the head of an owl, it looks regal and fierce.',
 });
 
 const deadBody = () => ({
@@ -84,7 +117,7 @@ const kitchen = () => ({
 });
 
 const myGame = new Engine({
-  entities: [pub, cellar, kitchen, goldRing, deadBody, drunkCook, mysteriousRoom],
+  entities: [pub, cellar, kitchen, goldRing, deadBody, drunkCook, owlHelmet, mysteriousDoor, mysteriousRoom, castellansSecretChamber],
   commands: {
     talk: ['talk to', 'ask', 'chat with']
   },
@@ -112,6 +145,17 @@ const myGame = new Engine({
         subject.data.hasGoldRing = false;
         game.location.things.add('goldRing');
       });
+    }
+
+    if (game.location.is('cellar') && command.e) {
+      const hasOwlHelmet = (
+        game.inventory.has('owlHelmet') ||
+        game.entity('castellansSecretChamber').things.has('owlHelmet')
+      );
+      if (!hasOwlHelmet) {
+        game.goTo('mysteriousRoom');
+        stopCommand();
+      }
     }
   }
 });
