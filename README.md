@@ -43,6 +43,7 @@ This project's goal is to make JavaScript-centric text game authoring (a little)
   - Items with amounts
   - 'Examine myself' / player state
   - Per-location aesthetics
+  - 'Exits are...'
   - Dark areas
   - Basic NPCs
 - API
@@ -856,6 +857,65 @@ body[data-location="field"] {
 }
 
 /* etc */
+```
+
+### 'Exits are...'
+
+```javascript
+// Less-evocative, but more convenient exit descriptions
+
+const pub = () => ({
+  id: 'pub',
+  summary: 'A cosy pub.',
+  description: 'This firelit drinking den is empty of people.',
+  to: {
+    down: 'cellar',
+    e: 'kitchen'
+  }
+});
+
+const cellar = () => ({
+  // ...
+});
+
+const kitchen = () => ({
+  // ...
+});
+
+// Utility function to list all 'to' commands
+// in the current location
+const reportExits = (game) => {
+  if (game.location.to) {
+    const exitList = Object.keys(game.location.to)
+      .map((k) => k.toUpperCase())
+      .join(', ');
+
+    game.print(`Exits are: ${exitList}.`);
+  }
+};
+
+const myGame = new Engine({
+  entities: [pub, cellar, kitchen],
+  // List exits when visiting location
+  onLocationVisit: ({ game }) => {
+    reportExits(game);
+  },
+  // List exits when LOOKing
+  onCommand: ({ game, command, afterCommand }) => {
+    if (command.look) {
+      afterCommand(() => reportExits(game));
+    }
+  }
+});
+
+myGame.start();
+```
+
+```text
+This firelit drinking den is empty of people.
+Exits are: DOWN, E.
+
+>
 ```
 
 ### Dark areas
