@@ -1227,9 +1227,9 @@ const newGame = new Engine({
     // ...
   },
 
-  // As for entity.onVisitLocation, but is called on *every*
+  // As for entity.onLocationVisit, but is called on *every*
   // location change, before the location's logic (if present).
-  onVisitLocation: ({ game, here }) => {
+  onLocationVisit: ({ game, here }) => {
     // ...
   }
 });
