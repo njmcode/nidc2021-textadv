@@ -256,7 +256,7 @@ You are carrying a tankard.
 
 The tavern is quite cosy, and has only a few people drinking.
 
-> DROP
+> DROP TANKARD
 
 Dropped.
 
