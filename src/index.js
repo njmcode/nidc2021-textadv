@@ -183,7 +183,9 @@ class Engine {
       entObj.is = (id) => entObj.id === id;
       entObj.exists = true;
       entObj.meta = {
-        visitCount: 0
+        visitCount: 0,
+        isInitialState: true,
+        isExamined: false
       };
 
       if (entObj.nouns) {
@@ -237,20 +239,37 @@ class Engine {
   }
 
   look = (forceFullDescription = false) => {
-    if (forceFullDescription || this.location.meta.visitCount === 1) {
+    const isFullLook = forceFullDescription || this.location.meta.visitCount === 1;
+    if (isFullLook) {
       this.print(this.location.description);
     } else {
       this.print(this.location.summary);
     }
 
     if (this.location.things.size > 0) {
-      const visibleEnts = [...this.location.things]
+      let visibleEnts = [...this.location.things]
         .map((h) => this.entities[h])
         .filter(
           (i) => !i.tags.has(this.TAGS.INVISIBLE)
             && !i.tags.has(this.TAGS.SCENERY)
             && !i.tags.has(this.TAGS.SILENT)
         );
+
+      if (isFullLook) {
+        // Print any 'initial' for
+        // unmolested items on full LOOK
+        const specialInitialEnts = visibleEnts.filter(
+          (i) => i.meta.isInitialState && i.initial
+        );
+
+        if (specialInitialEnts.length > 0) {
+          specialInitialEnts.forEach((i) => {
+            this.print(i.initial);
+          });
+        }
+
+        visibleEnts = visibleEnts.filter((i) => !specialInitialEnts.includes(i));
+      }
 
       if (visibleEnts.length > 0) {
         const listText = `${
@@ -393,6 +412,7 @@ class Engine {
         }
 
         this.print(subject.description);
+        subject.meta.isExamined = true;
         return;
       }
 
@@ -415,6 +435,7 @@ class Engine {
 
         this.location.things.delete(subject.id);
         this.state.inventory.add(subject.id);
+        subject.meta.isInitialState = false;
         this.print(this.MESSAGES.OK_GET);
         return;
       }
@@ -434,6 +455,7 @@ class Engine {
 
         this.state.inventory.delete(subject.id);
         this.location.things.add(subject.id);
+        subject.meta.isInitialState = false;
         this.print(this.MESSAGES.OK_DROP);
         return;
       }

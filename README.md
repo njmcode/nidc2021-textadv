@@ -200,7 +200,9 @@ The frame is exquisitely carved, while the bedclothes are made of the finest lin
 
 Entities can be treated as inventory items that the player can pick up.
 
-Provide a `nouns` array for the item, to help the player refer to it in-game. Then add its `id` to the `things` array of a location. The game will report the item's presence when describing the location, using its `summary`.
+Provide a `nouns` array for the item, to help the player refer to it in-game. Then add its `id` to the `things` array of a location.
+
+The game will report the item's presence when describing the location, using its `summary`. If `initial` is defined on the item, the game will print it instead of 'You can see...' for this item, _provided_ the item has not been picked up or moved by the player.
 
 The player can then manipulate the item with commands such as `GET` and `DROP`. If the item is `EXAMINE`d, its `description` is printed.
 
@@ -216,6 +218,7 @@ const tankard = () => ({
   id: 'tankard',
   nouns: ['tankard', 'drink', 'mug'],
   summary: 'a tankard',
+  initial: 'There is a drinking tankard perched on the bar.',
   description: 'This pewter drinking mug smells of old beer.'
 });
 
@@ -235,7 +238,7 @@ myGame.start();
 
 ```text
 The tavern is quite cosy, and has only a few people drinking.
-You can see a tankard.
+There is a drinking tankard perched on the bar.
 
 > EXAMINE TANKARD
 
@@ -252,6 +255,15 @@ You are carrying a tankard.
 > LOOK
 
 The tavern is quite cosy, and has only a few people drinking.
+
+> DROP TANKARD
+
+Dropped.
+
+> LOOK
+
+The tavern is quite cosy, and has only a few people drinking.
+You can see a tankard.
 ```
 
 ## Usable items and other game logic
@@ -906,12 +918,14 @@ const myGame = new Engine({
   onGoTo: ({ game, afterGoTo }) => {
     afterGoto(() => {
       reportExits(game);
-    }
+    });
   },
   // List exits when LOOKing
   onCommand: ({ game, command, afterCommand }) => {
     if (command.look) {
-      afterCommand(() => reportExits(game));
+      afterCommand(() => {
+        reportExits(game)
+      });
     }
   }
 });
@@ -952,6 +966,19 @@ const basement = () => ({
   description: 'No natural light reaches this basement area, which carries the stench of decay. The stairs lead back up.',
   to: {
     up: 'warehouse'
+  },
+  onGoTo: ({ game, stopGoTo }) => {
+    // Teleport the player to the dark place if they try
+    // to enter the basement without a light source
+    const hasLight = (
+      game.inventory.has('torch')
+      || game.entity('basement').things.has('torch')
+    );
+
+    if (!hasLight) {
+      game.goTo('darkPlace');
+      stopGoTo();
+    }
   }
 });
 
@@ -965,21 +992,7 @@ const darkPlace = () => ({
 });
 
 const newGame = new Engine({
-  entities: [warehouse, torch, basement, darkPlace],
-  onCommand: ({ game, command, stopCommand }) => {
-    // Teleport the player to the dark place if they try
-    // to enter the basement without a light source
-    if (game.location.is('warehouse') && command.down) {
-      const hasLight = (
-        game.inventory.has('torch') ||
-        game.entity('basement').things.has('torch')
-      );
-      if (!hasLight) {
-        game.goTo('darkPlace');
-        stopCommand();
-      }
-    }
-  }
+  entities: [warehouse, torch, basement, darkPlace]
 });
 
 newGame.start();
@@ -1108,6 +1121,14 @@ const someEntity = (getThis) => {
     // array usage not recommended here for items.
     summary: 'This is a summary',
 
+    // An initial description for inventory items.
+    // Follows the same rules as `description`.
+    // If defined, will be printed during the LOOK command
+    // instead of the item being listed in 'You can see...',
+    // provided the item hasn't been 'moved' from its
+    // original state (i.e. picked up by the player).
+    initial: 'This is an initial description',
+
     // Locations will trigger this callback every time,
     // *just before* they are visited via navigation
     // or game.goTo().
@@ -1128,10 +1149,20 @@ const someEntity = (getThis) => {
 
       // Returns the given 'live' entity object
       const entity = game.entity(entityId)
+
       entity.data
       entity.exists
       entity.is(entityId)
+
+      // `true` if this entity has been EXAMINEd at least once
+      entity.meta.isExamined
+      // `true` if this entity has not been the subject
+      // of a successful GET or DROP by the player yet
+      // (see entity.initial)
+      entity.meta.isInitialState
+      // Number of times this entity has been visited as a location
       entity.meta.visitCount
+
       // Entity arrays are converted to Sets by the engine.
       // Use Set methods (add, has, delete) to manipulate the following
       entity.tags

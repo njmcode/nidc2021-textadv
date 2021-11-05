@@ -6,13 +6,6 @@ import './index.scss';
 // Utility for color spans
 const ct = (color, text) => `<span style="color:${color};">${text}</span>`;
 
-// Shared function for a unique crowbar description when first revealed.
-// TODO: solve for this more generally in the engine
-const doCrowbarInitial = (game) => {
-  if (!game.location.things.has('crowbar') || !game.entity('crowbar').tags.has('silent')) return;
-  game.print('There is a crowbar sticking up from amongst the debris on the floor.');
-};
-
 const bomb = (getThis) => ({
   id: 'bomb',
   nouns: ['bomb', 'time bomb', 'explosives'],
@@ -28,7 +21,7 @@ const bomb = (getThis) => ({
 
 const basement = () => ({
   id: 'basement',
-  summary: 'A dingy basement with no way up.',
+  summary: 'A dingy basement with no way up. Oh, and a ticking bomb.',
   description: [
     'You are trapped in a dank basement with no visible means to get to the surface.',
     'Debris and rubbish is strewn about the floor, and a sturdy wooden door sits in the east wall.',
@@ -39,7 +32,7 @@ const basement = () => ({
     e: 'storage',
     in: 'storage'
   },
-  onGoTo: ({ game, afterGoTo }) => {
+  onGoTo: ({ game }) => {
     // Print game intro
     if (!game.location.meta.visitCount) {
       game.print([
@@ -47,11 +40,6 @@ const basement = () => ({
         '---'
       ], 'info');
     }
-
-    // Describe the crowbar if it's here but not moved
-    afterGoTo(() => {
-      doCrowbarInitial(game);
-    });
   }
 });
 
@@ -66,17 +54,14 @@ const debris = () => ({
   id: 'debris',
   nouns: ['debris', 'rubbish', 'rubble', 'stuff', 'floor'],
   tags: ['scenery'],
-  description: 'Broken glass, twisted rebar, smashed concrete, dust and other detritus.',
-  data: {
-    isExamined: false
-  }
+  description: 'Broken glass, twisted rebar, smashed concrete, dust and other detritus.'
 });
 
 const crowbar = () => ({
   id: 'crowbar',
   nouns: ['crowbar', 'bar', 'rusty crowbar'],
   summary: 'a crowbar',
-  tags: ['silent'],
+  initial: 'There is a crowbar sticking up from amongst the debris on the floor.',
   description: 'Rusted, but still sturdy.'
 });
 
@@ -114,10 +99,7 @@ const toolbox = () => ({
   id: 'toolbox',
   nouns: ['toolbox', 'tool box', 'box', 'toolkit', 'tool case'],
   summary: 'a toolbox',
-  description: 'A small metal case with a carry-handle. It is unlocked.',
-  data: {
-    isExamined: false
-  }
+  description: 'A small metal case with a carry-handle. It is unlocked.'
 });
 
 const wirecutters = () => ({
@@ -153,19 +135,9 @@ const newGame = new Engine({
   onCommand: ({
     game, command, subject, stopCommand, afterCommand
   }) => {
-    // Special crowbar handling
-    if (command.look && game.location.is('basement')) {
-      afterCommand(() => {
-        doCrowbarInitial(game);
-      });
-    }
-    if (command.get && subject.is('crowbar')) {
-      subject.tags.delete('silent');
-    }
-
     if (command.examine) {
       // Find crowbar in debris
-      if (subject.is('debris') && !subject.data.isExamined) {
+      if (subject.is('debris') && !subject.meta.isExamined) {
         afterCommand(() => {
           game.print('Sifting through the rubble, you uncover a rusty crowbar.');
           game.location.things.add('crowbar');
@@ -173,7 +145,7 @@ const newGame = new Engine({
       }
 
       // Find cutters in toolbox
-      if (subject.is('toolbox') && !subject.data.isExamined) {
+      if (subject.is('toolbox') && !subject.meta.isExamined) {
         afterCommand(() => {
           game.print('As you inspect the tool case, something falls out to the floor.');
           game.location.things.add('wirecutters');
