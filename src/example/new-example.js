@@ -6,6 +6,13 @@ import './index.scss';
 // Utility for color spans
 const ct = (color, text) => `<span style="color:${color};">${text}</span>`;
 
+// Shared function for a unique crowbar description when first revealed.
+// TODO: solve for this more generally in the engine
+const doCrowbarInitial = (game) => {
+  if (!game.location.things.has('crowbar') || !game.entity('crowbar').tags.has('silent')) return;
+  game.print('There is a crowbar sticking up from amongst the debris on the floor.');
+};
+
 const bomb = (getThis) => ({
   id: 'bomb',
   nouns: ['bomb', 'time bomb', 'explosives'],
@@ -32,7 +39,7 @@ const basement = () => ({
     e: 'storage',
     in: 'storage'
   },
-  onGoTo: ({ game }) => {
+  onGoTo: ({ game, afterGoTo }) => {
     // Print game intro
     if (!game.location.meta.visitCount) {
       game.print([
@@ -40,6 +47,11 @@ const basement = () => ({
         '---'
       ], 'info');
     }
+
+    // Describe the crowbar if it's here but not moved
+    afterGoTo(() => {
+      doCrowbarInitial(game);
+    });
   }
 });
 
@@ -64,6 +76,7 @@ const crowbar = () => ({
   id: 'crowbar',
   nouns: ['crowbar', 'bar', 'rusty crowbar'],
   summary: 'a crowbar',
+  tags: ['silent'],
   description: 'Rusted, but still sturdy.'
 });
 
@@ -81,8 +94,8 @@ const door = (getThis) => ({
 
 const storage = () => ({
   id: 'storage',
-  summary: 'A dingy storage room.',
-  description: 'This cramped storage room smells of must. Bits of broken timber lie strewn about. The west door leads out to the basement.',
+  summary: 'A cramped old storage room.',
+  description: 'This claustrophobic storage room smells of must. Bits of broken timber lie strewn about. The west door leads out to the basement.',
   things: ['toolbox', 'door'],
   to: {
     w: 'basement',
@@ -140,6 +153,16 @@ const newGame = new Engine({
   onCommand: ({
     game, command, subject, stopCommand, afterCommand
   }) => {
+    // Special crowbar handling
+    if (command.look && game.location.is('basement')) {
+      afterCommand(() => {
+        doCrowbarInitial(game);
+      });
+    }
+    if (command.get && subject.is('crowbar')) {
+      subject.tags.delete('silent');
+    }
+
     if (command.examine) {
       // Find crowbar in debris
       if (subject.is('debris') && !subject.data.isExamined) {
