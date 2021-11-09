@@ -172,6 +172,8 @@ class Engine {
     this.state.currentLocationId = this.config.startLocationId || this._defaultStartId;
     // Trigger any state logic in the first location
     this.goTo(this.state.currentLocationId, true);
+
+    return this;
   };
 
   get location() {
@@ -509,4 +511,8 @@ class Engine {
   };
 }
 
-export default Engine;
+const start = (config) => new Engine(config).start();
+
+export default {
+  start
+};
