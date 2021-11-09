@@ -1,4 +1,4 @@
-export const COMMANDS = {
+const COMMANDS = {
   n: 'n',
   e: 'e',
   w: 'w',
@@ -46,3 +46,5 @@ export const ALIASES = {
     'controls'
   ]
 };
+
+export default COMMANDS;

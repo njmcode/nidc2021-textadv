@@ -1,7 +1,8 @@
 /* eslint-disable no-param-reassign */
 import nlp from 'compromise';
 
-import { COMMANDS, ALIASES } from './commands';
+import COMMANDS, { ALIASES } from './commands';
+import TAGS from './tags';
 
 /**
 
@@ -13,13 +14,7 @@ BUGS:
 * */
 
 class Engine {
-  TAGS = {
-    SILENT: 'silent',
-    INVISIBLE: 'invisible',
-    FIXED: 'fixed',
-    QUIET: 'quiet',
-    SCENERY: 'scenery'
-  };
+  static TAGS = TAGS;
 
   MESSAGES = {
     LOCATION_ITEMS_PREFIX: 'You can see ',
@@ -208,9 +203,9 @@ class Engine {
       let visibleEnts = [...this.location.things]
         .map((h) => this.entities[h])
         .filter(
-          (i) => !i.tags.has(this.TAGS.INVISIBLE)
-            && !i.tags.has(this.TAGS.SCENERY)
-            && !i.tags.has(this.TAGS.SILENT)
+          (i) => !i.tags.has(TAGS.INVISIBLE)
+            && !i.tags.has(TAGS.SCENERY)
+            && !i.tags.has(TAGS.SILENT)
         );
 
       if (isFullLook) {
@@ -301,7 +296,7 @@ class Engine {
     const subject = this.getSubject(
       noun,
       [this.location.things, this.state.inventory],
-      (i) => !i.tags.has(this.TAGS.INVISIBLE)
+      (i) => !i.tags.has(TAGS.INVISIBLE)
     );
 
     if (typeof this.config.onCommand === 'function') {
@@ -377,8 +372,8 @@ class Engine {
       case this.COMMANDS.get: {
         if (
           !subject
-          || subject.tags.has(this.TAGS.SCENERY)
-          || subject.tags.has(this.TAGS.FIXED)
+          || subject.tags.has(TAGS.SCENERY)
+          || subject.tags.has(TAGS.FIXED)
         ) {
           this.print(this.MESSAGES.FAIL_GET);
           noTurn();
@@ -405,7 +400,7 @@ class Engine {
           return;
         }
 
-        if (subject.tags.has(this.TAGS.FIXED)) {
+        if (subject.tags.has(TAGS.FIXED)) {
           this.print(this.MESSAGES.FAIL_DROP);
           noTurn();
           return;
@@ -428,7 +423,7 @@ class Engine {
         const invText = [...this.state.inventory]
           .map((i) => this.entities[i])
           .filter(
-            (i) => !i.tags.has(this.TAGS.INVISIBLE) && !i.tags.has(this.TAGS.SILENT)
+            (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
           )
           .map((i) => this.dyntext(i.summary))
           .join(', ');
