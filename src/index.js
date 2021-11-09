@@ -8,7 +8,9 @@ import TAGS from './tags';
 const start = (config) => {
   const UI = uiHelper();
 
-  const { commands, baseCommandMap, nlp } = setupCommands(config);
+  const {
+    commands, aliases, baseCommandMap, nlp
+  } = setupCommands(config);
   const { entities, startLocationId, getSubject } = setupEntities(config);
 
   const gameMessages = { ...MESSAGES };
@@ -28,19 +30,105 @@ const start = (config) => {
   };
 
   const API = {
-    get location() {
-      return entities[gameState.currentLocationId];
+    ALIASES: aliases,
+
+    COMMANDS: commands,
+
+    doTurn() {
+      gameState.turnCount += 1;
     },
-    get inventory() {
-      return gameState.inventory;
+
+    dyntext(text) {
+      return (typeof text === 'function' ? text(API) : text);
     },
+
+    end() {
+      gameState.isActive = false;
+      UI.hideInput();
+    },
+
     entity(id) {
       if (!entities[id]) {
         throw new Error(`Game logic error: no entity '${id}' found`);
       }
-
       return entities[id];
-    }
+    },
+
+    goTo(entityId, skipTurn = false) {
+
+    },
+
+    get inventory() {
+      return gameState.inventory;
+    },
+
+    get location() {
+      return entities[gameState.currentLocationId];
+    },
+
+    look(forceFullDescription = false) {
+      const isFullLook = forceFullDescription || API.location.meta.visitCount === 1;
+
+      if (isFullLook) {
+        API.print(API.location.description);
+      } else {
+        API.print(API.location.summary);
+      }
+
+      if (API.location.things.size > 0) {
+        let visibleEnts = [...API.location.things]
+          .map((h) => entities[h])
+          .filter(
+            (i) => !i.tags.has(TAGS.INVISIBLE)
+              && !i.tags.has(TAGS.SCENERY)
+              && !i.tags.has(TAGS.SILENT)
+          );
+
+        if (isFullLook) {
+          // Print any 'initial' for
+          // unmolested items on full LOOK
+          const specialInitialEnts = visibleEnts.filter(
+            (i) => i.meta.isInitialState && i.initial
+          );
+
+          if (specialInitialEnts.length > 0) {
+            specialInitialEnts.forEach((i) => {
+              API.print(i.initial);
+            });
+          }
+
+          visibleEnts = visibleEnts.filter((i) => !specialInitialEnts.includes(i));
+        }
+
+        if (visibleEnts.length > 0) {
+          const listText = `${
+            gameMessages.LOCATION_ITEMS_PREFIX
+          }${visibleEnts.map((i) => API.dyntext(i.summary)).join(', ')}.`;
+
+          API.print(listText);
+        }
+      }
+    },
+
+    MESSAGES: gameMessages,
+
+    print(outputText, cssClass) {
+      if (!outputText) return;
+
+      if (outputText instanceof Array) {
+        outputText.forEach((ot) => API.print(ot, cssClass));
+        return;
+      }
+
+      UI.writeOutput(API.dyntext(outputText), cssClass);
+      UI.scrollToBottom();
+    },
+
+    get state() {
+      return gameState;
+    },
+
+    TAGS
   };
 
   class Engine {
@@ -49,7 +137,7 @@ const start = (config) => {
         if (!gameState.isActive) return;
         if (!inputText) return;
 
-        this.print(inputText, 'input');
+        API.print(inputText, 'input');
         UI.clearInput();
 
         this.afterCommand = null;
@@ -100,60 +188,17 @@ const start = (config) => {
       return API.inventory;
     }
 
+    // eslint-disable-next-line class-methods-use-this
     look = (forceFullDescription = false) => {
-      const isFullLook = forceFullDescription || API.location.meta.visitCount === 1;
-      if (isFullLook) {
-        this.print(API.location.description);
-      } else {
-        this.print(API.location.summary);
-      }
-
-      if (API.location.things.size > 0) {
-        let visibleEnts = [...API.location.things]
-          .map((h) => entities[h])
-          .filter(
-            (i) => !i.tags.has(TAGS.INVISIBLE)
-              && !i.tags.has(TAGS.SCENERY)
-              && !i.tags.has(TAGS.SILENT)
-          );
-
-        if (isFullLook) {
-          // Print any 'initial' for
-          // unmolested items on full LOOK
-          const specialInitialEnts = visibleEnts.filter(
-            (i) => i.meta.isInitialState && i.initial
-          );
-
-          if (specialInitialEnts.length > 0) {
-            specialInitialEnts.forEach((i) => {
-              this.print(i.initial);
-            });
-          }
-
-          visibleEnts = visibleEnts.filter((i) => !specialInitialEnts.includes(i));
-        }
-
-        if (visibleEnts.length > 0) {
-          const listText = `${
-            gameMessages.LOCATION_ITEMS_PREFIX
-          }${visibleEnts.map((i) => this.dyntext(i.summary)).join(', ')}.`;
-          this.print(listText);
-        }
-      }
+      API.look(forceFullDescription);
     };
 
-    dyntext = (text) => (typeof text === 'function' ? text(this) : text);
+    // eslint-disable-next-line class-methods-use-this
+    dyntext = (text) => API.dyntext(text);
 
+    // eslint-disable-next-line class-methods-use-this
     print = (outputText, cssClass) => {
-      if (!outputText) return;
-
-      if (outputText instanceof Array) {
-        outputText.forEach((ot) => this.print(ot, cssClass));
-        return;
-      }
-
-      UI.writeOutput(this.dyntext(outputText), cssClass);
-      UI.scrollToBottom();
+      API.print(outputText, cssClass);
     };
 
     // eslint-disable-next-line class-methods-use-this
@@ -161,7 +206,7 @@ const start = (config) => {
 
     // eslint-disable-next-line class-methods-use-this
     doTurn = () => {
-      gameState.turnCount += 1;
+      API.doTurn();
     };
 
     parse = (inputText) => {
@@ -175,7 +220,7 @@ const start = (config) => {
       };
 
       if (!(verb in baseCommandMap)) {
-        this.print(gameMessages.FAIL_UNKNOWN);
+        API.print(gameMessages.FAIL_UNKNOWN);
         noTurn();
         return;
       }
@@ -236,28 +281,28 @@ const start = (config) => {
         case commands.in:
         case commands.out: {
           if (!API.location.to || !(baseCommand in API.location.to)) {
-            this.print(gameMessages.FAIL_NO_EXIT);
+            API.print(gameMessages.FAIL_NO_EXIT);
             return;
           }
 
-          this.goTo(API.location.to[baseCommand]);
+          API.goTo(API.location.to[baseCommand]);
           return;
         }
 
         case commands.look: {
-          this.look(true);
+          API.look(true);
           noTurn();
           return;
         }
 
         case commands.examine: {
           if (!subject) {
-            this.print(gameMessages.FAIL_EXAMINE);
+            API.print(gameMessages.FAIL_EXAMINE);
             noTurn();
             return;
           }
 
-          this.print(subject.description);
+          API.print(subject.description);
           subject.meta.isExamined = true;
           return;
         }
@@ -268,13 +313,13 @@ const start = (config) => {
             || subject.tags.has(TAGS.SCENERY)
             || subject.tags.has(TAGS.FIXED)
           ) {
-            this.print(gameMessages.FAIL_GET);
+            API.print(gameMessages.FAIL_GET);
             noTurn();
             return;
           }
 
           if (API.inventory.has(subject.id)) {
-            this.print(gameMessages.FAIL_GET_OWNED);
+            API.print(gameMessages.FAIL_GET_OWNED);
             noTurn();
             return;
           }
@@ -282,19 +327,19 @@ const start = (config) => {
           API.location.things.delete(subject.id);
           API.inventory.add(subject.id);
           subject.meta.isInitialState = false;
-          this.print(gameMessages.OK_GET);
+          API.print(gameMessages.OK_GET);
           return;
         }
 
         case commands.drop: {
           if (!subject || !API.inventory.has(subject.id)) {
-            this.print(gameMessages.FAIL_DROP_OWNED);
+            API.print(gameMessages.FAIL_DROP_OWNED);
             noTurn();
             return;
           }
 
           if (subject.tags.has(TAGS.FIXED)) {
-            this.print(gameMessages.FAIL_DROP);
+            API.print(gameMessages.FAIL_DROP);
             noTurn();
             return;
           }
@@ -302,13 +347,13 @@ const start = (config) => {
           API.inventory.delete(subject.id);
           API.location.things.add(subject.id);
           subject.meta.isInitialState = false;
-          this.print(gameMessages.OK_DROP);
+          API.print(gameMessages.OK_DROP);
           return;
         }
 
         case commands.inventory: {
           if (API.inventory.size === 0) {
-            this.print(gameMessages.INV_NONE);
+            API.print(gameMessages.INV_NONE);
             noTurn();
             return;
           }
@@ -318,16 +363,17 @@ const start = (config) => {
             .filter(
               (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
             )
-            .map((i) => this.dyntext(i.summary))
+            .map((i) => API.dyntext(i.summary))
             .join(', ');
-          this.print(`${gameMessages.INV_PREFIX}${invText}.`);
+
+          API.print(`${gameMessages.INV_PREFIX}${invText}.`);
           noTurn();
           return;
         }
 
         case commands.help: {
-          this.print(
-            `Basic commands: ${Object.values(this.COMMANDS).join(
+          API.print(
+            `Basic commands: ${Object.values(commands).join(
               ', '
             )}. Try other words too!`,
             'info'
@@ -337,7 +383,7 @@ const start = (config) => {
         }
 
         default: {
-          this.print(gameMessages.FAIL_UNHANDLED);
+          API.print(gameMessages.FAIL_UNHANDLED);
           noTurn();
         }
       }
@@ -377,8 +423,8 @@ const start = (config) => {
 
       gameState.currentLocationId = locationId;
       API.location.meta.visitCount += 1;
-      this.look();
-      if (!skipTurn) this.doTurn();
+      API.look();
+      if (!skipTurn) API.doTurn();
 
       if (typeof _afterLocationChangeCallback === 'function') {
         _afterLocationChangeCallback();
@@ -386,10 +432,9 @@ const start = (config) => {
     };
 
     // eslint-disable-next-line class-methods-use-this
-    end = () => {
-      gameState.isActive = false;
-      UI.hideInput();
-    };
+    end() {
+      API.end();
+    }
   }
 
   return new Engine().start();
