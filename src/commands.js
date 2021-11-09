@@ -1,3 +1,6 @@
+/* eslint-disable no-param-reassign */
+import nlp from 'compromise';
+
 const COMMANDS = {
   n: 'n',
   e: 'e',
@@ -47,4 +50,44 @@ export const ALIASES = {
   ]
 };
 
-export default COMMANDS;
+const setupCommands = (config) => {
+  const commands = { ...COMMANDS };
+  const aliases = { ...ALIASES };
+
+  if (config.commands) {
+    Object.entries(config.commands).forEach(([cmd, aliasList]) => {
+      commands[cmd] = cmd;
+      aliases[cmd] = aliasList;
+    });
+  }
+
+  const baseCommandMap = Object.entries(aliases).reduce(
+    (obj, [baseCmd, aliasList]) => {
+      obj[baseCmd] = baseCmd;
+      aliasList.forEach((alias) => { obj[alias] = baseCmd; });
+      return obj;
+    },
+    {}
+  );
+
+  // Let compromise know about our new verbs
+  nlp.extend((_Doc, world) => {
+    // Blow away the NLP built-in dict
+    // TODO: surely there's a way to use it?
+
+    // world.words = {};
+
+    const ext = Object.keys(baseCommandMap).reduce((obj, k) => {
+      obj[k] = 'Verb';
+      return obj;
+    }, {});
+
+    world.addWords(ext);
+  });
+
+  return {
+    commands, aliases, baseCommandMap, nlp
+  };
+};
+
+export default setupCommands;
