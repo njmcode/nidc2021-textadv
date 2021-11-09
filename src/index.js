@@ -27,6 +27,22 @@ const start = (config) => {
     UI.clearOutput();
   };
 
+  const API = {
+    get location() {
+      return entities[gameState.currentLocationId];
+    },
+    get inventory() {
+      return gameState.inventory;
+    },
+    entity(id) {
+      if (!entities[id]) {
+        throw new Error(`Game logic error: no entity '${id}' found`);
+      }
+
+      return entities[id];
+    }
+  };
+
   class Engine {
     constructor() {
       UI.onSubmit((inputText) => {
@@ -76,24 +92,24 @@ const start = (config) => {
 
     // eslint-disable-next-line class-methods-use-this
     get location() {
-      return entities[gameState.currentLocationId];
+      return API.location;
     }
 
     // eslint-disable-next-line class-methods-use-this
     get inventory() {
-      return gameState.inventory;
+      return API.inventory;
     }
 
     look = (forceFullDescription = false) => {
-      const isFullLook = forceFullDescription || this.location.meta.visitCount === 1;
+      const isFullLook = forceFullDescription || API.location.meta.visitCount === 1;
       if (isFullLook) {
-        this.print(this.location.description);
+        this.print(API.location.description);
       } else {
-        this.print(this.location.summary);
+        this.print(API.location.summary);
       }
 
-      if (this.location.things.size > 0) {
-        let visibleEnts = [...this.location.things]
+      if (API.location.things.size > 0) {
+        let visibleEnts = [...API.location.things]
           .map((h) => entities[h])
           .filter(
             (i) => !i.tags.has(TAGS.INVISIBLE)
@@ -141,13 +157,7 @@ const start = (config) => {
     };
 
     // eslint-disable-next-line class-methods-use-this
-    entity = (id) => {
-      if (!entities[id]) {
-        throw new Error(`Game logic error: no entity '${id}' found`);
-      }
-
-      return entities[id];
-    };
+    entity = (id) => API.entity(id);
 
     // eslint-disable-next-line class-methods-use-this
     doTurn = () => {
@@ -178,7 +188,7 @@ const start = (config) => {
 
       const subject = getSubject(
         noun,
-        [this.location.things, gameState.inventory],
+        [API.location.things, API.inventory],
         (i) => !i.tags.has(TAGS.INVISIBLE)
       );
 
@@ -211,8 +221,8 @@ const start = (config) => {
 
       if (!gameState.isActive) return;
 
-      if (this.location.to && baseCommand in this.location.to) {
-        this.goTo(this.location.to[baseCommand]);
+      if (API.location.to && baseCommand in API.location.to) {
+        this.goTo(API.location.to[baseCommand]);
         return;
       }
 
@@ -225,12 +235,12 @@ const start = (config) => {
         case commands.down:
         case commands.in:
         case commands.out: {
-          if (!this.location.to || !(baseCommand in this.location.to)) {
+          if (!API.location.to || !(baseCommand in API.location.to)) {
             this.print(gameMessages.FAIL_NO_EXIT);
             return;
           }
 
-          this.goTo(this.location.to[baseCommand]);
+          this.goTo(API.location.to[baseCommand]);
           return;
         }
 
@@ -263,21 +273,21 @@ const start = (config) => {
             return;
           }
 
-          if (gameState.inventory.has(subject.id)) {
+          if (API.inventory.has(subject.id)) {
             this.print(gameMessages.FAIL_GET_OWNED);
             noTurn();
             return;
           }
 
-          this.location.things.delete(subject.id);
-          gameState.inventory.add(subject.id);
+          API.location.things.delete(subject.id);
+          API.inventory.add(subject.id);
           subject.meta.isInitialState = false;
           this.print(gameMessages.OK_GET);
           return;
         }
 
         case commands.drop: {
-          if (!subject || !gameState.inventory.has(subject.id)) {
+          if (!subject || !API.inventory.has(subject.id)) {
             this.print(gameMessages.FAIL_DROP_OWNED);
             noTurn();
             return;
@@ -289,21 +299,21 @@ const start = (config) => {
             return;
           }
 
-          gameState.inventory.delete(subject.id);
-          this.location.things.add(subject.id);
+          API.inventory.delete(subject.id);
+          API.location.things.add(subject.id);
           subject.meta.isInitialState = false;
           this.print(gameMessages.OK_DROP);
           return;
         }
 
         case commands.inventory: {
-          if (gameState.inventory.size === 0) {
+          if (API.inventory.size === 0) {
             this.print(gameMessages.INV_NONE);
             noTurn();
             return;
           }
 
-          const invText = [...gameState.inventory]
+          const invText = [...API.inventory]
             .map((i) => entities[i])
             .filter(
               (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
@@ -334,11 +344,7 @@ const start = (config) => {
     };
 
     goTo = (locationId, skipTurn = false) => {
-      if (!(locationId in entities)) {
-        throw new Error(`goTo(): unknown entity ID '${locationId}'`);
-      }
-
-      const destination = this.entity(locationId);
+      const destination = API.entity(locationId);
 
       let _shouldStopChange = false;
       let _afterLocationChangeCallback = null;
@@ -370,7 +376,7 @@ const start = (config) => {
       if (!gameState.isActive || _shouldStopChange) return;
 
       gameState.currentLocationId = locationId;
-      this.location.meta.visitCount += 1;
+      API.location.meta.visitCount += 1;
       this.look();
       if (!skipTurn) this.doTurn();
 
