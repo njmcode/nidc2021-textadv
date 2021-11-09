@@ -4,6 +4,7 @@ import nlp from 'compromise';
 import COMMANDS, { ALIASES } from './commands';
 import TAGS from './tags';
 import MESSAGES from './messages';
+import uiHelper from './ui';
 
 const start = (config) => {
   // Set up verbs
@@ -45,27 +46,18 @@ const start = (config) => {
     ...MESSAGES
   };
 
-  // Hook up the DOM
-  const gameEls = {
-    inputForm: document.querySelector('.game-input'),
-    inputField: document.querySelector('.game-typed-input'),
-    output: document.querySelector('.game-output')
-  };
+  const UI = uiHelper();
 
   let gameState;
 
   class Engine {
     constructor() {
-      gameEls.inputForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-
+      UI.onSubmit((inputText) => {
         if (!gameState.isActive) return;
-
-        const inputText = gameEls.inputField.value.trim();
         if (!inputText) return;
 
-        this.print(inputText.trim(), 'input');
-        gameEls.inputField.value = '';
+        this.print(inputText, 'input');
+        UI.clearInput();
 
         this.afterCommand = null;
         this.shouldUpdateTurn = true;
@@ -157,7 +149,8 @@ const start = (config) => {
         world.addWords(extraNouns);
       });
 
-      gameEls.output.innerHTML = '';
+      UI.clearOutput();
+
       gameState.currentLocationId = config.startLocationId || this._defaultStartId;
       // Trigger any state logic in the first location
       this.goTo(gameState.currentLocationId, true);
@@ -226,13 +219,8 @@ const start = (config) => {
         return;
       }
 
-      const pEl = document.createElement('p');
-      pEl.innerHTML = this.dyntext(outputText);
-
-      if (cssClass) pEl.classList.add(cssClass);
-      gameEls.output.appendChild(pEl);
-
-      window.scrollTo(0, document.body.scrollHeight);
+      UI.writeOutput(this.dyntext(outputText), cssClass);
+      UI.scrollToBottom();
     };
 
     entity = (id) => {
@@ -492,7 +480,7 @@ const start = (config) => {
     // eslint-disable-next-line class-methods-use-this
     end = () => {
       gameState.isActive = false;
-      gameEls.inputForm.classList.add('hidden');
+      UI.hideInput();
     };
   }
 
