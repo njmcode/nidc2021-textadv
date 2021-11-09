@@ -1,6 +1,8 @@
 /* eslint-disable no-param-reassign */
 import nlp from 'compromise';
 
+import { COMMANDS, ALIASES } from './commands';
+
 /**
 
 BUGS:
@@ -11,55 +13,6 @@ BUGS:
 * */
 
 class Engine {
-  COMMANDS = {
-    n: 'n',
-    e: 'e',
-    w: 'w',
-    s: 's',
-    up: 'up',
-    down: 'down',
-    in: 'in',
-    out: 'out',
-    look: 'look',
-    examine: 'examine',
-    get: 'get',
-    drop: 'drop',
-    inventory: 'inventory',
-    help: 'help'
-  };
-
-  ALIASES = {
-    [this.COMMANDS.n]: ['north', 'go north'],
-    [this.COMMANDS.e]: ['east', 'go east'],
-    [this.COMMANDS.w]: ['west', 'go west'],
-    [this.COMMANDS.s]: ['south', 'go south'],
-    [this.COMMANDS.up]: ['u', 'go up', 'ascend'],
-    [this.COMMANDS.down]: ['d', 'go down', 'descend'],
-    [this.COMMANDS.in]: ['enter', 'go in'],
-    [this.COMMANDS.out]: ['leave', 'go out', 'exit'],
-    [this.COMMANDS.look]: ['look around', 'where', 'where am i', 'whereami'],
-    [this.COMMANDS.examine]: ['look at', 'inspect', 'x', 'ex', 'search'],
-    [this.COMMANDS.get]: ['g', 'take', 'pick up', 'obtain', 'acquire', 'grab'],
-    [this.COMMANDS.drop]: ['put down', 'toss', 'remove', 'discard'],
-    [this.COMMANDS.inventory]: [
-      'inv',
-      'carrying',
-      'equipment',
-      'items',
-      'gear'
-    ],
-    [this.COMMANDS.help]: [
-      'instructions',
-      'howto',
-      'how to play',
-      '?',
-      'commands',
-      'verbs',
-      'words',
-      'controls'
-    ]
-  };
-
   TAGS = {
     SILENT: 'silent',
     INVISIBLE: 'invisible',
@@ -85,9 +38,14 @@ class Engine {
   };
 
   constructor(config) {
+    // TODO: sanitize/validate entries
     this.config = config;
 
-    // TODO: sanitize/validate entries
+    this.COMMANDS = { ...COMMANDS };
+    this.ALIASES = Object.entries(ALIASES).reduce((obj, [k, v]) => {
+      obj[k] = v;
+      return obj;
+    }, {});
 
     if (this.config.commands) {
       Object.entries(this.config.commands).forEach(([cmd, aliases]) => {
