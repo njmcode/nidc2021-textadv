@@ -25,10 +25,10 @@ export const ALIASES = {
   [COMMANDS.s]: ['south', 'go south'],
   [COMMANDS.up]: ['u', 'go up', 'ascend'],
   [COMMANDS.down]: ['d', 'go down', 'descend'],
-  [COMMANDS.in]: ['enter', 'go in'],
-  [COMMANDS.out]: ['leave', 'go out', 'exit'],
+  [COMMANDS.in]: ['enter', 'go in', 'get in'],
+  [COMMANDS.out]: ['leave', 'go out', 'get out', 'exit'],
   [COMMANDS.look]: ['look around', 'where', 'where am i', 'whereami'],
-  [COMMANDS.examine]: ['look at', 'inspect', 'x', 'ex', 'search'],
+  [COMMANDS.examine]: ['look at', 'inspect', 'x', 'ex', 'search', 'check'],
   [COMMANDS.get]: ['g', 'take', 'pick up', 'obtain', 'acquire', 'grab'],
   [COMMANDS.drop]: ['put down', 'toss', 'remove', 'discard'],
   [COMMANDS.inventory]: [
