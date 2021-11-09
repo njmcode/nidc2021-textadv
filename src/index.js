@@ -5,74 +5,67 @@ import COMMANDS, { ALIASES } from './commands';
 import TAGS from './tags';
 import MESSAGES from './messages';
 
-const start = (cfg) => {
+const start = (config) => {
+  // Set up verbs
+  const commands = { ...COMMANDS };
+  const aliases = { ...ALIASES };
+
+  if (config.commands) {
+    Object.entries(config.commands).forEach(([cmd, aliasList]) => {
+      commands[cmd] = cmd;
+      aliases[cmd] = aliasList;
+    });
+  }
+
+  const baseCommandMap = Object.entries(aliases).reduce(
+    (obj, [baseCmd, aliasList]) => {
+      obj[baseCmd] = baseCmd;
+      aliasList.forEach((alias) => { obj[alias] = baseCmd; });
+      return obj;
+    },
+    {}
+  );
+
+  // Let compromise know about our new verbs
+  nlp.extend((_Doc, world) => {
+    // Blow away the NLP built-in dict
+    // TODO: surely there's a way to use it?
+
+    // world.words = {};
+
+    const ext = Object.keys(baseCommandMap).reduce((obj, k) => {
+      obj[k] = 'Verb';
+      return obj;
+    }, {});
+
+    world.addWords(ext);
+  });
+
+  const gameMessages = {
+    ...MESSAGES
+  };
+
+  // Hook up the DOM
+  const gameEls = {
+    inputForm: document.querySelector('.game-input'),
+    inputField: document.querySelector('.game-typed-input'),
+    output: document.querySelector('.game-output')
+  };
+
   let gameState;
 
   class Engine {
-    static TAGS = TAGS;
-
-    constructor(config) {
-      // TODO: sanitize/validate entries
-      this.config = config;
-
-      // Temp instance vars until class is refactored
-      this.MESSAGES = { ...MESSAGES };
-      this.COMMANDS = { ...COMMANDS };
-      this.ALIASES = Object.entries(ALIASES).reduce((obj, [k, v]) => {
-        obj[k] = v;
-        return obj;
-      }, {});
-
-      // Add custom commands + aliases
-      if (this.config.commands) {
-        Object.entries(this.config.commands).forEach(([cmd, aliases]) => {
-          this.COMMANDS[cmd] = cmd;
-          this.ALIASES[cmd] = aliases;
-        });
-      }
-
-      // Build alias->command map
-      this.validCommands = Object.entries(this.ALIASES).reduce(
-        (obj, [baseCmd, aliases]) => {
-          obj[baseCmd] = baseCmd;
-          aliases.forEach((alias) => { obj[alias] = baseCmd; });
-          return obj;
-        },
-        {}
-      );
-      console.log('validCommands', this.validCommands);
-
-      // Let compromise know about our new verbs
-      nlp.extend((_Doc, world) => {
-        // Blow away the NLP built-in dict
-        // TODO: surely there's a way to use it?
-        // world.words = {};
-
-        const extraVerbs = Object.keys(this.validCommands).reduce((obj, k) => {
-          obj[k] = 'Verb';
-          return obj;
-        }, {});
-
-        world.addWords(extraVerbs);
-      });
-
-      // Hook up the DOM
-      this.els = {
-        inputForm: document.querySelector('.game-input'),
-        inputField: document.querySelector('.game-typed-input'),
-        output: document.querySelector('.game-output')
-      };
-
-      this.els.inputForm.addEventListener('submit', (e) => {
+    constructor() {
+      gameEls.inputForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
         if (!gameState.isActive) return;
 
-        const inputText = this.els.inputField.value.trim();
+        const inputText = gameEls.inputField.value.trim();
         if (!inputText) return;
 
         this.print(inputText.trim(), 'input');
-        this.els.inputField.value = '';
+        gameEls.inputField.value = '';
 
         this.afterCommand = null;
         this.shouldUpdateTurn = true;
@@ -90,21 +83,21 @@ const start = (cfg) => {
 
         if (this.shouldUpdateTurn) {
           gameState.turnCount += 1;
-          if (typeof this.config.onTurn === 'function') {
-            this.config.onTurn({ game: this, turnCount: gameState.turnCount });
+          if (typeof config.onTurn === 'function') {
+            config.onTurn({ game: this, turnCount: gameState.turnCount });
           }
         }
       });
-
-      console.info('Engine: ready to start');
     }
 
     start = () => {
+      console.log('Starting...');
+
       gameState = {
         turnCount: 0,
         isActive: true,
         currentLocationId: null,
-        inventory: new Set(this.config.startInventory || []),
+        inventory: new Set(config.startInventory || []),
         lastSubject: null
       };
       // temp instance ref until we can clean up the public API
@@ -113,7 +106,7 @@ const start = (cfg) => {
       this.validNouns = {};
       this.afterCommand = null;
 
-      this.entities = this.config.entities.reduce((obj, ent, idx) => {
+      this.entities = config.entities.reduce((obj, ent, idx) => {
         const entObj = ent(() => this.entities[entObj.id]);
         if (!entObj.id) {
           console.error(entObj);
@@ -146,7 +139,7 @@ const start = (cfg) => {
 
         obj[entObj.id] = entObj;
 
-        if (idx === 0 && this.config.startLocationId === undefined) {
+        if (idx === 0 && config.startLocationId === undefined) {
           this._defaultStartId = entObj.id;
         }
 
@@ -164,8 +157,8 @@ const start = (cfg) => {
         world.addWords(extraNouns);
       });
 
-      this.els.output.innerHTML = '';
-      gameState.currentLocationId = this.config.startLocationId || this._defaultStartId;
+      gameEls.output.innerHTML = '';
+      gameState.currentLocationId = config.startLocationId || this._defaultStartId;
       // Trigger any state logic in the first location
       this.goTo(gameState.currentLocationId, true);
 
@@ -216,7 +209,7 @@ const start = (cfg) => {
 
         if (visibleEnts.length > 0) {
           const listText = `${
-            this.MESSAGES.LOCATION_ITEMS_PREFIX
+            gameMessages.LOCATION_ITEMS_PREFIX
           }${visibleEnts.map((i) => this.dyntext(i.summary)).join(', ')}.`;
           this.print(listText);
         }
@@ -237,7 +230,7 @@ const start = (cfg) => {
       pEl.innerHTML = this.dyntext(outputText);
 
       if (cssClass) pEl.classList.add(cssClass);
-      this.els.output.appendChild(pEl);
+      gameEls.output.appendChild(pEl);
 
       window.scrollTo(0, document.body.scrollHeight);
     };
@@ -258,13 +251,6 @@ const start = (cfg) => {
     parse = (inputText) => {
       const parsed = nlp(inputText);
 
-      console.group('parse');
-      console.log('parsed', parsed);
-      console.log('TAGS', parsed.out('tags'));
-      console.log('VERBS', parsed.verbs().out('array'));
-      console.log('NOUNS', parsed.nouns().out('array'));
-      console.groupEnd('parse');
-
       const verb = parsed.verbs().out('array')[0];
       const noun = parsed.nouns().out('array')[0];
 
@@ -272,13 +258,13 @@ const start = (cfg) => {
         this.shouldUpdateTurn = false;
       };
 
-      if (!(verb in this.validCommands)) {
-        this.print(this.MESSAGES.FAIL_UNKNOWN);
+      if (!(verb in baseCommandMap)) {
+        this.print(gameMessages.FAIL_UNKNOWN);
         noTurn();
         return;
       }
 
-      const baseCommand = this.validCommands[verb];
+      const baseCommand = baseCommandMap[verb];
 
       // Build list of potential subjects from:
       // - Current location 'has'
@@ -290,7 +276,7 @@ const start = (cfg) => {
         (i) => !i.tags.has(TAGS.INVISIBLE)
       );
 
-      if (typeof this.config.onCommand === 'function') {
+      if (typeof config.onCommand === 'function') {
         let shouldStopCommand = false;
 
         const stopCommand = (suppressTurn = false) => {
@@ -300,13 +286,13 @@ const start = (cfg) => {
 
         const afterCommand = (cb) => { this.afterCommand = cb; };
 
-        const command = Object.keys(this.COMMANDS).reduce((obj, k) => {
+        const command = Object.keys(commands).reduce((obj, k) => {
           obj[k] = baseCommand === k;
           return obj;
         }, {});
         command._base = baseCommand;
 
-        this.config.onCommand({
+        config.onCommand({
           command,
           subject: subject || { is: () => false, exists: false },
           game: this,
@@ -325,16 +311,16 @@ const start = (cfg) => {
       }
 
       switch (baseCommand) {
-        case this.COMMANDS.n:
-        case this.COMMANDS.s:
-        case this.COMMANDS.e:
-        case this.COMMANDS.w:
-        case this.COMMANDS.up:
-        case this.COMMANDS.down:
-        case this.COMMANDS.in:
-        case this.COMMANDS.out: {
+        case commands.n:
+        case commands.s:
+        case commands.e:
+        case commands.w:
+        case commands.up:
+        case commands.down:
+        case commands.in:
+        case commands.out: {
           if (!this.location.to || !(baseCommand in this.location.to)) {
-            this.print(this.MESSAGES.FAIL_NO_EXIT);
+            this.print(gameMessages.FAIL_NO_EXIT);
             return;
           }
 
@@ -342,15 +328,15 @@ const start = (cfg) => {
           return;
         }
 
-        case this.COMMANDS.look: {
+        case commands.look: {
           this.look(true);
           noTurn();
           return;
         }
 
-        case this.COMMANDS.examine: {
+        case commands.examine: {
           if (!subject) {
-            this.print(this.MESSAGES.FAIL_EXAMINE);
+            this.print(gameMessages.FAIL_EXAMINE);
             noTurn();
             return;
           }
@@ -360,19 +346,19 @@ const start = (cfg) => {
           return;
         }
 
-        case this.COMMANDS.get: {
+        case commands.get: {
           if (
             !subject
             || subject.tags.has(TAGS.SCENERY)
             || subject.tags.has(TAGS.FIXED)
           ) {
-            this.print(this.MESSAGES.FAIL_GET);
+            this.print(gameMessages.FAIL_GET);
             noTurn();
             return;
           }
 
           if (gameState.inventory.has(subject.id)) {
-            this.print(this.MESSAGES.FAIL_GET_OWNED);
+            this.print(gameMessages.FAIL_GET_OWNED);
             noTurn();
             return;
           }
@@ -380,19 +366,19 @@ const start = (cfg) => {
           this.location.things.delete(subject.id);
           gameState.inventory.add(subject.id);
           subject.meta.isInitialState = false;
-          this.print(this.MESSAGES.OK_GET);
+          this.print(gameMessages.OK_GET);
           return;
         }
 
-        case this.COMMANDS.drop: {
+        case commands.drop: {
           if (!subject || !gameState.inventory.has(subject.id)) {
-            this.print(this.MESSAGES.FAIL_DROP_OWNED);
+            this.print(gameMessages.FAIL_DROP_OWNED);
             noTurn();
             return;
           }
 
           if (subject.tags.has(TAGS.FIXED)) {
-            this.print(this.MESSAGES.FAIL_DROP);
+            this.print(gameMessages.FAIL_DROP);
             noTurn();
             return;
           }
@@ -400,13 +386,13 @@ const start = (cfg) => {
           gameState.inventory.delete(subject.id);
           this.location.things.add(subject.id);
           subject.meta.isInitialState = false;
-          this.print(this.MESSAGES.OK_DROP);
+          this.print(gameMessages.OK_DROP);
           return;
         }
 
-        case this.COMMANDS.inventory: {
+        case commands.inventory: {
           if (gameState.inventory.size === 0) {
-            this.print(this.MESSAGES.INV_NONE);
+            this.print(gameMessages.INV_NONE);
             noTurn();
             return;
           }
@@ -418,12 +404,12 @@ const start = (cfg) => {
             )
             .map((i) => this.dyntext(i.summary))
             .join(', ');
-          this.print(`${this.MESSAGES.INV_PREFIX}${invText}.`);
+          this.print(`${gameMessages.INV_PREFIX}${invText}.`);
           noTurn();
           return;
         }
 
-        case this.COMMANDS.help: {
+        case commands.help: {
           this.print(
             `Basic commands: ${Object.values(this.COMMANDS).join(
               ', '
@@ -435,7 +421,7 @@ const start = (cfg) => {
         }
 
         default: {
-          this.print(this.MESSAGES.FAIL_UNHANDLED);
+          this.print(gameMessages.FAIL_UNHANDLED);
           noTurn();
         }
       }
@@ -475,8 +461,8 @@ const start = (cfg) => {
         _afterLocationChangeCallback = cb;
       };
 
-      if (typeof this.config.onGoTo === 'function') {
-        this.config.onGoTo({
+      if (typeof config.onGoTo === 'function') {
+        config.onGoTo({
           game: this, destination, stopGoTo, afterGoTo
         });
       }
@@ -503,13 +489,14 @@ const start = (cfg) => {
       }
     };
 
+    // eslint-disable-next-line class-methods-use-this
     end = () => {
       gameState.isActive = false;
-      this.els.inputForm.classList.add('hidden');
+      gameEls.inputForm.classList.add('hidden');
     };
   }
 
-  return new Engine(cfg).start();
+  return new Engine().start();
 };
 
 export default {

@@ -1283,3 +1283,4 @@ Engine.start({
 - [ ] Command history + clear
 - [ ] Utility functions (rnd in array, print list, etc)
 - [ ] Configurable DOM elements
+- [ ] Configurable message overrides
