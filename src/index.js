@@ -3,6 +3,7 @@ import nlp from 'compromise';
 
 import COMMANDS, { ALIASES } from './commands';
 import TAGS from './tags';
+import MESSAGES from './messages';
 
 /**
 
@@ -16,32 +17,19 @@ BUGS:
 class Engine {
   static TAGS = TAGS;
 
-  MESSAGES = {
-    LOCATION_ITEMS_PREFIX: 'You can see ',
-    INV_PREFIX: 'You are carrying ',
-    INV_NONE: 'You are carrying nothing.',
-    FAIL_UNKNOWN: 'Sorry, I don\'t understand.',
-    FAIL_UNHANDLED: 'Sorry, I can\'t do that.',
-    FAIL_NO_EXIT: 'You can\'t go that way.',
-    FAIL_EXAMINE: 'Sorry, I can\'t see that.',
-    FAIL_GET: "Sorry, I can't get that.",
-    FAIL_GET_OWNED: 'You already seem to have that.',
-    FAIL_DROP: "Sorry, I can't drop that.",
-    FAIL_DROP_OWNED: "You don't seem to have that.",
-    OK_GET: 'Taken.',
-    OK_DROP: 'Dropped.'
-  };
-
   constructor(config) {
     // TODO: sanitize/validate entries
     this.config = config;
 
+    // Temp instance vars until class is refactored
+    this.MESSAGES = { ...MESSAGES };
     this.COMMANDS = { ...COMMANDS };
     this.ALIASES = Object.entries(ALIASES).reduce((obj, [k, v]) => {
       obj[k] = v;
       return obj;
     }, {});
 
+    // Add custom commands + aliases
     if (this.config.commands) {
       Object.entries(this.config.commands).forEach(([cmd, aliases]) => {
         this.COMMANDS[cmd] = cmd;
@@ -49,6 +37,7 @@ class Engine {
       });
     }
 
+    // Build alias->command map
     this.validCommands = Object.entries(this.ALIASES).reduce(
       (obj, [baseCmd, aliases]) => {
         obj[baseCmd] = baseCmd;
@@ -59,6 +48,7 @@ class Engine {
     );
     console.log('validCommands', this.validCommands);
 
+    // Let compromise know about our new verbs
     nlp.extend((_Doc, world) => {
       // Blow away the NLP built-in dict
       // TODO: surely there's a way to use it?
@@ -72,6 +62,7 @@ class Engine {
       world.addWords(extraVerbs);
     });
 
+    // Hook up the DOM
     this.els = {
       inputForm: document.querySelector('.game-input'),
       inputField: document.querySelector('.game-typed-input'),
