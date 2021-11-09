@@ -9,7 +9,7 @@ const start = (config) => {
   const UI = uiHelper();
 
   const { commands, baseCommandMap, nlp } = setupCommands(config);
-  const { entities, baseNounMap, startLocationId } = setupEntities(config);
+  const { entities, startLocationId, getSubject } = setupEntities(config);
 
   const gameMessages = { ...MESSAGES };
 
@@ -176,7 +176,7 @@ const start = (config) => {
       // - Current location 'has'
       // - Player inventory
 
-      const subject = this.getSubject(
+      const subject = getSubject(
         noun,
         [this.location.things, gameState.inventory],
         (i) => !i.tags.has(TAGS.INVISIBLE)
@@ -331,23 +331,6 @@ const start = (config) => {
           noTurn();
         }
       }
-    };
-
-    // eslint-disable-next-line class-methods-use-this
-    getSubject = (noun, fromLists, filterFn = () => true) => {
-      if (!(noun in baseNounMap)) return false;
-      if (!(fromLists instanceof Array)) fromLists = [fromLists];
-
-      const nounSubject = entities[baseNounMap[noun]];
-
-      let validSubject = false;
-      fromLists.forEach((list) => {
-        if (list.has(nounSubject.id) && filterFn(nounSubject)) {
-          validSubject = nounSubject;
-        }
-      });
-
-      return validSubject;
     };
 
     goTo = (locationId, skipTurn = false) => {

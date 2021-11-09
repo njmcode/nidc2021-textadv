@@ -57,10 +57,27 @@ const setupEntities = (config) => {
     world.addWords(extraNouns);
   });
 
+  const getSubject = (noun, fromLists, filterFn = () => true) => {
+    if (!(noun in baseNounMap)) return false;
+    if (!(fromLists instanceof Array)) fromLists = [fromLists];
+
+    const nounSubject = entities[baseNounMap[noun]];
+
+    let validSubject = false;
+    fromLists.forEach((list) => {
+      if (list.has(nounSubject.id) && filterFn(nounSubject)) {
+        validSubject = nounSubject;
+      }
+    });
+
+    return validSubject;
+  };
+
   return {
     entities,
     baseNounMap,
-    startLocationId
+    startLocationId,
+    getSubject
   };
 };
 
