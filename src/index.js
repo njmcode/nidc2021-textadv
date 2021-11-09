@@ -1,18 +1,19 @@
 /* eslint-disable no-param-reassign */
-import setupCommands from './commands';
-import TAGS from './tags';
-import MESSAGES from './messages';
 import uiHelper from './ui';
+import setupCommands from './commands';
+import MESSAGES from './messages';
+import TAGS from './tags';
 
 const start = (config) => {
-  const { commands, baseCommandMap, nlp } = setupCommands(config);
   const UI = uiHelper();
 
+  const { commands, baseCommandMap, nlp } = setupCommands(config);
   const gameMessages = {
     ...MESSAGES
   };
 
-  let gameState;
+  let gameEntities = {};
+  let gameState = {};
 
   class Engine {
     constructor() {
@@ -62,8 +63,8 @@ const start = (config) => {
       this.validNouns = {};
       this.afterCommand = null;
 
-      this.entities = config.entities.reduce((obj, ent, idx) => {
-        const entObj = ent(() => this.entities[entObj.id]);
+      gameEntities = config.entities.reduce((obj, ent, idx) => {
+        const entObj = ent(() => gameEntities[entObj.id]);
         if (!entObj.id) {
           console.error(entObj);
           throw new Error('Missing entity id');
@@ -122,8 +123,9 @@ const start = (config) => {
       return this;
     };
 
+    // eslint-disable-next-line class-methods-use-this
     get location() {
-      return this.entities[gameState.currentLocationId];
+      return gameEntities[gameState.currentLocationId];
     }
 
     // eslint-disable-next-line class-methods-use-this
@@ -141,7 +143,7 @@ const start = (config) => {
 
       if (this.location.things.size > 0) {
         let visibleEnts = [...this.location.things]
-          .map((h) => this.entities[h])
+          .map((h) => gameEntities[h])
           .filter(
             (i) => !i.tags.has(TAGS.INVISIBLE)
               && !i.tags.has(TAGS.SCENERY)
@@ -187,12 +189,13 @@ const start = (config) => {
       UI.scrollToBottom();
     };
 
+    // eslint-disable-next-line class-methods-use-this
     entity = (id) => {
-      if (!this.entities[id]) {
-        throw new Error(`Game logic error: no entity id '${id}'`);
+      if (!gameEntities[id]) {
+        throw new Error(`Game logic error: no entity '${id}' found`);
       }
 
-      return this.entities[id];
+      return gameEntities[id];
     };
 
     // eslint-disable-next-line class-methods-use-this
@@ -350,7 +353,7 @@ const start = (config) => {
           }
 
           const invText = [...gameState.inventory]
-            .map((i) => this.entities[i])
+            .map((i) => gameEntities[i])
             .filter(
               (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
             )
@@ -383,7 +386,7 @@ const start = (config) => {
       if (!(noun in this.validNouns)) return false;
       if (!(fromLists instanceof Array)) fromLists = [fromLists];
 
-      const nounSubject = this.entities[this.validNouns[noun]];
+      const nounSubject = gameEntities[this.validNouns[noun]];
 
       let validSubject = false;
       fromLists.forEach((list) => {
@@ -396,7 +399,7 @@ const start = (config) => {
     };
 
     goTo = (locationId, skipTurn = false) => {
-      if (!(locationId in this.entities)) {
+      if (!(locationId in gameEntities)) {
         throw new Error(`goTo(): unknown entity ID '${locationId}'`);
       }
 
