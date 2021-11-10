@@ -1,5 +1,5 @@
 /* eslint-disable no-param-reassign */
-import Engine from '..';
+import Engine from '../lib/index.modern';
 import 'normalize.css';
 import './index.scss';
 
