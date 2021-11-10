@@ -1,568 +1,232 @@
 /* eslint-disable no-param-reassign */
-import nlp from 'compromise';
+import uiHelper from './ui';
+import setupCommands from './commands';
+import setupEntities from './entities';
+import MESSAGES from './messages';
+import TAGS from './tags';
+import parse from './parse';
 
-/**
+const start = (config) => {
+  const UI = uiHelper();
 
-BUGS:
+  const {
+    commands, aliases, baseCommandMap
+  } = setupCommands(config);
+  const { entities, startLocationId, getSubject } = setupEntities(config);
 
-- 'use key' not recognized as verb
-- 'me' not recognized as noun
+  const gameMessages = { ...MESSAGES };
 
-* */
-
-class Engine {
-  COMMANDS = {
-    n: 'n',
-    e: 'e',
-    w: 'w',
-    s: 's',
-    up: 'up',
-    down: 'down',
-    in: 'in',
-    out: 'out',
-    look: 'look',
-    examine: 'examine',
-    get: 'get',
-    drop: 'drop',
-    inventory: 'inventory',
-    help: 'help'
+  const gameState = {
+    turnCount: 0,
+    isActive: true,
+    currentLocationId: startLocationId,
+    inventory: new Set(config.startInventory || []),
+    lastSubject: null
   };
 
-  ALIASES = {
-    [this.COMMANDS.n]: ['north', 'go north'],
-    [this.COMMANDS.e]: ['east', 'go east'],
-    [this.COMMANDS.w]: ['west', 'go west'],
-    [this.COMMANDS.s]: ['south', 'go south'],
-    [this.COMMANDS.up]: ['u', 'go up', 'ascend'],
-    [this.COMMANDS.down]: ['d', 'go down', 'descend'],
-    [this.COMMANDS.in]: ['enter', 'go in'],
-    [this.COMMANDS.out]: ['leave', 'go out', 'exit'],
-    [this.COMMANDS.look]: ['look around', 'where', 'where am i', 'whereami'],
-    [this.COMMANDS.examine]: ['look at', 'inspect', 'x', 'ex', 'search'],
-    [this.COMMANDS.get]: ['g', 'take', 'pick up', 'obtain', 'acquire', 'grab'],
-    [this.COMMANDS.drop]: ['put down', 'toss', 'remove', 'discard'],
-    [this.COMMANDS.inventory]: [
-      'inv',
-      'carrying',
-      'equipment',
-      'items',
-      'gear'
-    ],
-    [this.COMMANDS.help]: [
-      'instructions',
-      'howto',
-      'how to play',
-      '?',
-      'commands',
-      'verbs',
-      'words',
-      'controls'
-    ]
-  };
+  let afterCommandCallback;
+  let shouldUpdateTurn;
 
-  TAGS = {
-    SILENT: 'silent',
-    INVISIBLE: 'invisible',
-    FIXED: 'fixed',
-    QUIET: 'quiet',
-    SCENERY: 'scenery'
-  };
+  const API = {
+    ALIASES: aliases,
 
-  MESSAGES = {
-    LOCATION_ITEMS_PREFIX: 'You can see ',
-    INV_PREFIX: 'You are carrying ',
-    INV_NONE: 'You are carrying nothing.',
-    FAIL_UNKNOWN: 'Sorry, I don\'t understand.',
-    FAIL_UNHANDLED: 'Sorry, I can\'t do that.',
-    FAIL_NO_EXIT: 'You can\'t go that way.',
-    FAIL_EXAMINE: 'Sorry, I can\'t see that.',
-    FAIL_GET: "Sorry, I can't get that.",
-    FAIL_GET_OWNED: 'You already seem to have that.',
-    FAIL_DROP: "Sorry, I can't drop that.",
-    FAIL_DROP_OWNED: "You don't seem to have that.",
-    OK_GET: 'Taken.',
-    OK_DROP: 'Dropped.'
-  };
+    COMMANDS: commands,
 
-  constructor(config) {
-    this.config = config;
+    clear() {
+      UI.clearOutput();
+    },
 
-    // TODO: sanitize/validate entries
+    doTurn() {
+      gameState.turnCount += 1;
+    },
 
-    if (this.config.commands) {
-      Object.entries(this.config.commands).forEach(([cmd, aliases]) => {
-        this.COMMANDS[cmd] = cmd;
-        this.ALIASES[cmd] = aliases;
-      });
-    }
+    dyntext(text) {
+      return (typeof text === 'function' ? text(API) : text);
+    },
 
-    this.validCommands = Object.entries(this.ALIASES).reduce(
-      (obj, [baseCmd, aliases]) => {
-        obj[baseCmd] = baseCmd;
-        aliases.forEach((alias) => { obj[alias] = baseCmd; });
-        return obj;
-      },
-      {}
-    );
-    console.log('validCommands', this.validCommands);
+    end() {
+      gameState.isActive = false;
+      UI.hideInput();
+    },
 
-    nlp.extend((_Doc, world) => {
-      // Blow away the NLP built-in dict
-      // TODO: surely there's a way to use it?
-      // world.words = {};
-
-      const extraVerbs = Object.keys(this.validCommands).reduce((obj, k) => {
-        obj[k] = 'Verb';
-        return obj;
-      }, {});
-
-      world.addWords(extraVerbs);
-    });
-
-    this.els = {
-      inputForm: document.querySelector('.game-input'),
-      inputField: document.querySelector('.game-typed-input'),
-      output: document.querySelector('.game-output')
-    };
-
-    this.els.inputForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-
-      if (!this.state.isActive) return;
-
-      const inputText = this.els.inputField.value.trim();
-      if (!inputText) return;
-
-      this.print(inputText.trim(), 'input');
-      this.els.inputField.value = '';
-
-      this.afterCommand = null;
-      this.shouldUpdateTurn = true;
-
-      this.parse(inputText.toLowerCase());
-
-      if (!this.state.isActive) return;
-
-      if (typeof this.afterCommand === 'function') {
-        this.afterCommand();
-        this.afterCommand = null;
+    entity(id) {
+      if (!entities[id]) {
+        throw new Error(`Game logic error: no entity '${id}' found`);
       }
+      return entities[id];
+    },
 
-      if (!this.state.isActive) return;
+    goTo(locationId, skipTurn = false) {
+      const destination = API.entity(locationId);
 
-      if (this.shouldUpdateTurn) {
-        this.state.turnCount += 1;
-        if (typeof this.config.onTurn === 'function') {
-          this.config.onTurn({ game: this, turnCount: this.state.turnCount });
-        }
-      }
-    });
+      let shouldStopChange = false;
+      let afterLocationChangeCallback = null;
 
-    console.info('Engine: ready to start');
-  }
-
-  start = () => {
-    this.state = {
-      turnCount: 0,
-      isActive: true,
-      currentLocationId: null,
-      inventory: new Set(this.config.startInventory || []),
-      lastSubject: null
-    };
-
-    this.validNouns = {};
-    this.afterCommand = null;
-
-    this.entities = this.config.entities.reduce((obj, ent, idx) => {
-      const entObj = ent(() => this.entities[entObj.id]);
-      if (!entObj.id) {
-        console.error(entObj);
-        throw new Error('Missing entity id');
-      }
-
-      entObj.is = (id) => entObj.id === id;
-      entObj.exists = true;
-      entObj.meta = {
-        visitCount: 0,
-        isInitialState: true,
-        isExamined: false
+      const stopGoTo = () => {
+        shouldStopChange = true;
       };
 
-      if (entObj.nouns) {
-        entObj.nouns.forEach((noun) => {
-          if (noun in this.validNouns) {
-            throw new Error(`Duplicate noun '${noun}' found for entity '${entObj.id}'`);
-          }
+      const afterGoTo = (cb) => {
+        afterLocationChangeCallback = cb;
+      };
 
-          this.validNouns[noun] = entObj.id;
+      if (typeof config.onGoTo === 'function') {
+        config.onGoTo({
+          game: API, destination, stopGoTo, afterGoTo
         });
       }
 
-      if (!entObj.data) entObj.data = {};
-      if (!entObj.things) entObj.things = [];
-      if (!entObj.tags) entObj.tags = [];
-      entObj.things = new Set(entObj.things);
-      entObj.tags = new Set(entObj.tags);
+      // FIXME: turn tracking may not be intuitive here
 
-      obj[entObj.id] = entObj;
+      if (!gameState.isActive || shouldStopChange) return;
 
-      if (idx === 0 && this.config.startLocationId === undefined) {
-        this._defaultStartId = entObj.id;
+      if (typeof destination.onGoTo === 'function') {
+        destination.onGoTo({
+          game: API, stopGoTo, afterGoTo
+        });
       }
 
-      return obj;
-    }, {});
+      if (!gameState.isActive || shouldStopChange) return;
 
-    console.log('validNouns', this.validNouns);
+      gameState.currentLocationId = locationId;
+      API.location.meta.visitCount += 1;
+      API.look();
 
-    nlp.extend((_Doc, world) => {
-      const extraNouns = Object.keys(this.validNouns).reduce((obj, k) => {
-        obj[k] = 'Noun';
-        return obj;
-      }, {});
+      if (!skipTurn) API.doTurn();
 
-      world.addWords(extraNouns);
-    });
+      if (typeof afterLocationChangeCallback === 'function') {
+        afterLocationChangeCallback();
+      }
+    },
 
-    this.els.output.innerHTML = '';
-    this.state.currentLocationId = this.config.startLocationId || this._defaultStartId;
-    // Trigger any state logic in the first location
-    this.goTo(this.state.currentLocationId, true);
-  };
+    get inventory() {
+      return gameState.inventory;
+    },
 
-  get location() {
-    return this.entities[this.state.currentLocationId];
-  }
+    get location() {
+      return entities[gameState.currentLocationId];
+    },
 
-  get inventory() {
-    return this.state.inventory;
-  }
-
-  look = (forceFullDescription = false) => {
-    const isFullLook = forceFullDescription || this.location.meta.visitCount === 1;
-    if (isFullLook) {
-      this.print(this.location.description);
-    } else {
-      this.print(this.location.summary);
-    }
-
-    if (this.location.things.size > 0) {
-      let visibleEnts = [...this.location.things]
-        .map((h) => this.entities[h])
-        .filter(
-          (i) => !i.tags.has(this.TAGS.INVISIBLE)
-            && !i.tags.has(this.TAGS.SCENERY)
-            && !i.tags.has(this.TAGS.SILENT)
-        );
+    look(forceFullDescription = false) {
+      const isFullLook = forceFullDescription || API.location.meta.visitCount === 1;
 
       if (isFullLook) {
-        // Print any 'initial' for
-        // unmolested items on full LOOK
-        const specialInitialEnts = visibleEnts.filter(
-          (i) => i.meta.isInitialState && i.initial
-        );
+        API.print(API.location.description);
+      } else {
+        API.print(API.location.summary);
+      }
 
-        if (specialInitialEnts.length > 0) {
-          specialInitialEnts.forEach((i) => {
-            this.print(i.initial);
-          });
+      if (API.location.things.size > 0) {
+        let visibleEnts = [...API.location.things]
+          .map((h) => entities[h])
+          .filter(
+            (i) => !i.tags.has(TAGS.INVISIBLE)
+              && !i.tags.has(TAGS.SCENERY)
+              && !i.tags.has(TAGS.SILENT)
+          );
+
+        if (isFullLook) {
+          // Print any 'initial' entries for
+          // unmolested items on full LOOK
+          const specialInitialEnts = visibleEnts.filter(
+            (i) => i.meta.isInitialState && i.initial
+          );
+
+          if (specialInitialEnts.length > 0) {
+            specialInitialEnts.forEach((i) => {
+              API.print(i.initial);
+            });
+          }
+
+          visibleEnts = visibleEnts.filter((i) => !specialInitialEnts.includes(i));
         }
 
-        visibleEnts = visibleEnts.filter((i) => !specialInitialEnts.includes(i));
+        if (visibleEnts.length > 0) {
+          const listText = `${
+            gameMessages.LOCATION_ITEMS_PREFIX
+          }${visibleEnts.map((i) => API.dyntext(i.summary)).join(', ')}.`;
+
+          API.print(listText);
+        }
+      }
+    },
+
+    MESSAGES: gameMessages,
+
+    noTurn() {
+      shouldUpdateTurn = false;
+    },
+
+    print(outputText, cssClass) {
+      if (!outputText) return;
+
+      if (outputText instanceof Array) {
+        outputText.forEach((ot) => API.print(ot, cssClass));
+        return;
       }
 
-      if (visibleEnts.length > 0) {
-        const listText = `${
-          this.MESSAGES.LOCATION_ITEMS_PREFIX
-        }${visibleEnts.map((i) => this.dyntext(i.summary)).join(', ')}.`;
-        this.print(listText);
-      }
-    }
+      UI.writeOutput(API.dyntext(outputText), cssClass);
+      UI.scrollToBottom();
+    },
+
+    get state() {
+      return gameState;
+    },
+
+    TAGS
   };
 
-  dyntext = (text) => (typeof text === 'function' ? text(this) : text);
+  // Setup input-parse-output loop
+  UI.onSubmit((inputText) => {
+    if (!inputText) return;
+    if (!gameState.isActive) return;
 
-  print = (outputText, cssClass) => {
-    if (!outputText) return;
+    afterCommandCallback = null;
+    shouldUpdateTurn = true;
 
-    if (outputText instanceof Array) {
-      outputText.forEach((ot) => this.print(ot, cssClass));
-      return;
-    }
+    API.print(inputText, 'input');
+    UI.clearInput();
 
-    const pEl = document.createElement('p');
-    pEl.innerHTML = this.dyntext(outputText);
-
-    if (cssClass) pEl.classList.add(cssClass);
-    this.els.output.appendChild(pEl);
-
-    window.scrollTo(0, document.body.scrollHeight);
-  };
-
-  entity = (id) => {
-    if (!this.entities[id]) {
-      throw new Error(`Game logic error: no entity id '${id}'`);
-    }
-
-    return this.entities[id];
-  };
-
-  doTurn = () => {
-    this.state.turnCount += 1;
-  };
-
-  parse = (inputText) => {
-    const parsed = nlp(inputText);
-
-    console.group('parse');
-    console.log('parsed', parsed);
-    console.log('TAGS', parsed.out('tags'));
-    console.log('VERBS', parsed.verbs().out('array'));
-    console.log('NOUNS', parsed.nouns().out('array'));
-    console.groupEnd('parse');
-
-    const verb = parsed.verbs().out('array')[0];
-    const noun = parsed.nouns().out('array')[0];
-
-    const noTurn = () => {
-      this.shouldUpdateTurn = false;
+    const afterCommand = (cb) => {
+      afterCommandCallback = cb;
     };
 
-    if (!(verb in this.validCommands)) {
-      this.print(this.MESSAGES.FAIL_UNKNOWN);
-      noTurn();
-      return;
-    }
-
-    const baseCommand = this.validCommands[verb];
-
-    // Build list of potential subjects from:
-    // - Current location 'has'
-    // - Player inventory
-
-    const subject = this.getSubject(
-      noun,
-      [this.location.things, this.state.inventory],
-      (i) => !i.tags.has(this.TAGS.INVISIBLE)
-    );
-
-    if (typeof this.config.onCommand === 'function') {
-      let shouldStopCommand = false;
-
-      const stopCommand = (suppressTurn = false) => {
-        shouldStopCommand = true;
-        if (suppressTurn) noTurn();
-      };
-
-      const afterCommand = (cb) => { this.afterCommand = cb; };
-
-      const command = Object.keys(this.COMMANDS).reduce((obj, k) => {
-        obj[k] = baseCommand === k;
-        return obj;
-      }, {});
-      command._base = baseCommand;
-
-      this.config.onCommand({
-        command,
-        subject: subject || { is: () => false, exists: false },
-        game: this,
-        stopCommand,
-        afterCommand,
-        noTurn
-      });
-      if (shouldStopCommand) return;
-    }
-
-    if (!this.state.isActive) return;
-
-    if (this.location.to && baseCommand in this.location.to) {
-      this.goTo(this.location.to[baseCommand]);
-      return;
-    }
-
-    switch (baseCommand) {
-      case this.COMMANDS.n:
-      case this.COMMANDS.s:
-      case this.COMMANDS.e:
-      case this.COMMANDS.w:
-      case this.COMMANDS.up:
-      case this.COMMANDS.down:
-      case this.COMMANDS.in:
-      case this.COMMANDS.out: {
-        if (!this.location.to || !(baseCommand in this.location.to)) {
-          this.print(this.MESSAGES.FAIL_NO_EXIT);
-          return;
-        }
-
-        this.goTo(this.location.to[baseCommand]);
-        return;
-      }
-
-      case this.COMMANDS.look: {
-        this.look(true);
-        noTurn();
-        return;
-      }
-
-      case this.COMMANDS.examine: {
-        if (!subject) {
-          this.print(this.MESSAGES.FAIL_EXAMINE);
-          noTurn();
-          return;
-        }
-
-        this.print(subject.description);
-        subject.meta.isExamined = true;
-        return;
-      }
-
-      case this.COMMANDS.get: {
-        if (
-          !subject
-          || subject.tags.has(this.TAGS.SCENERY)
-          || subject.tags.has(this.TAGS.FIXED)
-        ) {
-          this.print(this.MESSAGES.FAIL_GET);
-          noTurn();
-          return;
-        }
-
-        if (this.state.inventory.has(subject.id)) {
-          this.print(this.MESSAGES.FAIL_GET_OWNED);
-          noTurn();
-          return;
-        }
-
-        this.location.things.delete(subject.id);
-        this.state.inventory.add(subject.id);
-        subject.meta.isInitialState = false;
-        this.print(this.MESSAGES.OK_GET);
-        return;
-      }
-
-      case this.COMMANDS.drop: {
-        if (!subject || !this.state.inventory.has(subject.id)) {
-          this.print(this.MESSAGES.FAIL_DROP_OWNED);
-          noTurn();
-          return;
-        }
-
-        if (subject.tags.has(this.TAGS.FIXED)) {
-          this.print(this.MESSAGES.FAIL_DROP);
-          noTurn();
-          return;
-        }
-
-        this.state.inventory.delete(subject.id);
-        this.location.things.add(subject.id);
-        subject.meta.isInitialState = false;
-        this.print(this.MESSAGES.OK_DROP);
-        return;
-      }
-
-      case this.COMMANDS.inventory: {
-        if (this.state.inventory.size === 0) {
-          this.print(this.MESSAGES.INV_NONE);
-          noTurn();
-          return;
-        }
-
-        const invText = [...this.state.inventory]
-          .map((i) => this.entities[i])
-          .filter(
-            (i) => !i.tags.has(this.TAGS.INVISIBLE) && !i.tags.has(this.TAGS.SILENT)
-          )
-          .map((i) => this.dyntext(i.summary))
-          .join(', ');
-        this.print(`${this.MESSAGES.INV_PREFIX}${invText}.`);
-        noTurn();
-        return;
-      }
-
-      case this.COMMANDS.help: {
-        this.print(
-          `Basic commands: ${Object.values(this.COMMANDS).join(
-            ', '
-          )}. Try other words too!`,
-          'info'
-        );
-        noTurn();
-        return;
-      }
-
-      default: {
-        this.print(this.MESSAGES.FAIL_UNHANDLED);
-        noTurn();
-      }
-    }
-  };
-
-  getSubject = (noun, fromLists, filterFn = () => true) => {
-    if (!(noun in this.validNouns)) return false;
-    if (!(fromLists instanceof Array)) fromLists = [fromLists];
-
-    const nounSubject = this.entities[this.validNouns[noun]];
-
-    let validSubject = false;
-    fromLists.forEach((list) => {
-      if (list.has(nounSubject.id) && filterFn(nounSubject)) {
-        validSubject = nounSubject;
-      }
+    parse({
+      inputText,
+      API,
+      baseCommandMap,
+      entities,
+      commands,
+      gameState,
+      getSubject,
+      config,
+      gameMessages,
+      afterCommand
     });
 
-    return validSubject;
-  };
+    if (!gameState.isActive) return;
 
-  goTo = (locationId, skipTurn = false) => {
-    if (!(locationId in this.entities)) {
-      throw new Error(`goTo(): unknown entity ID '${locationId}'`);
+    if (typeof afterCommandCallback === 'function') {
+      afterCommandCallback();
+      afterCommandCallback = null;
     }
 
-    const destination = this.entity(locationId);
+    if (!gameState.isActive) return;
 
-    let _shouldStopChange = false;
-    let _afterLocationChangeCallback = null;
+    if (shouldUpdateTurn) {
+      API.doTurn();
 
-    const stopGoTo = () => {
-      _shouldStopChange = true;
-    };
-
-    const afterGoTo = (cb) => {
-      _afterLocationChangeCallback = cb;
-    };
-
-    if (typeof this.config.onGoTo === 'function') {
-      this.config.onGoTo({
-        game: this, destination, stopGoTo, afterGoTo
-      });
+      if (typeof config.onTurn === 'function') {
+        config.onTurn({ game: API, turnCount: gameState.turnCount });
+      }
     }
+  });
 
-    // FIXME: turn tracking may not be intuitive here
+  // Start the game
+  UI.clearOutput();
+  API.goTo(gameState.currentLocationId, true);
+};
 
-    if (!this.state.isActive || _shouldStopChange) return;
-
-    if (typeof destination.onGoTo === 'function') {
-      destination.onGoTo({
-        game: this, stopGoTo, afterGoTo
-      });
-    }
-
-    if (!this.state.isActive || _shouldStopChange) return;
-
-    this.state.currentLocationId = locationId;
-    this.location.meta.visitCount += 1;
-    this.look();
-    if (!skipTurn) this.doTurn();
-
-    if (typeof _afterLocationChangeCallback === 'function') {
-      _afterLocationChangeCallback();
-    }
-  };
-
-  end = () => {
-    this.state.isActive = false;
-    this.els.inputForm.classList.add('hidden');
-  };
-}
-
-export default Engine;
+export default {
+  start
+};

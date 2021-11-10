@@ -7,12 +7,15 @@ Heavily inspred by [_Graphic Adventure Creator_](https://en.wikipedia.org/wiki/_
 ```text
 A dank dungeon. To the north is a tavern.
 You can see a rusty sword.
+
 > GET SWORD
 
-Okay.
+Taken.
+
 > EXAMINE IT
 
 A worn but useable shortsword.
+
 > N
 
 A lively tavern. A dungeon lies to the south.
@@ -89,10 +92,9 @@ const anotherEntity = () => ({
   // ...
 });
 
-const myGame = new Engine({
+Engine.start({
   entities: [someEntity, anotherEntity]
 });
-myGame.start();
 ```
 
 ## Creating the game map
@@ -134,10 +136,9 @@ const kitchen = () => ({
   }
 });
 
-const myGame = new Engine({
+Engine.start({
   entities: [pub, cellar, kitchen]
 });
-myGame.start();
 ```
 
 ```text
@@ -230,10 +231,9 @@ const tavern = () => ({
   things: ['tankard']
 });
 
-const myGame = new Engine({
+Engine.start({
   entities: [tavern, tankard]
 });
-myGame.start();
 ```
 
 ```text
@@ -384,7 +384,7 @@ const key = () => ({
   description: 'A simple door key.'
 });
 
-const myGame = new Engine({
+Engine.start({
   entities: [hallway, apartment, key],
   // Define a new 'unlock' command
   commands: {
@@ -423,8 +423,6 @@ const myGame = new Engine({
     }
   }
 });
-
-myGame.start();
 ```
 
 ```text
@@ -482,7 +480,7 @@ const blueButton = ({
   tags: ['scenery']
 });
 
-const myGame = new Engine({
+Engine.start({
   entities: [lab, redButton, blueButton],
   commands: {
     push: ['push', 'press', 'hit', 'activate']
@@ -501,8 +499,6 @@ const myGame = new Engine({
     }
   }
 });
-
-myGame.start();
 ```
 
 ```text
@@ -556,7 +552,7 @@ const key = () => ({
   description: 'An ancient-looking, rusted iron key.',
 });
 
-const newGame = new Engine({
+Engine.start({
   entities: [library, book, key],
   onCommand: ({
     game, command, subject, afterCommand
@@ -575,8 +571,6 @@ const newGame = new Engine({
     }
   }
 });
-
-newGame.start();
 ```
 
 ```text
@@ -673,13 +667,11 @@ const note = () => ({
   description: 'This note is of vital importance and must be kept safe!'
 });
 
-const newGame = new Engine({
+Engine.start({
   //...
   startInventory: ['note'],
   //...
 });
-
-newGame.start();
 ```
 
 ```text
@@ -718,7 +710,7 @@ const basement = () => ({
   things: ['timeBomb']
 });
 
-const newGame = new Engine({
+Engine.start({
   entities: [basement, timeBomb],
   onTurn: ({ game }) => {
     const bomb = game.entity('timeBomb');
@@ -732,8 +724,6 @@ const newGame = new Engine({
     }
   }
 });
-
-newGame.start();
 ```
 
 ### Items with amounts
@@ -770,7 +760,7 @@ const storeroom = () => ({
   things: ['coinAdder']
 });
 
-const newGame = new Engine({
+Engine.start({
   entities: [storeroom, moneyTracker, coinAdder],
   startInventory: ['moneyTracker'],
   // onTurn fires after every valid turn,
@@ -786,8 +776,6 @@ const newGame = new Engine({
     }
   }
 });
-
-newGame.start();
 ```
 
 ```text
@@ -826,13 +814,11 @@ const player = () => ({
   tags: ['fixed', 'silent']
 });
 
-const newGame = new Engine({
+Engine.start({
   // ...
   startInventory: ['player'],
   // ...
 });
-
-newGame.start();
 ```
 
 ```text
@@ -852,7 +838,7 @@ As good-looking as ever.
 // before any location-specific ones) to add a hook for CSS
 // to target.
 
-const newGame = new Engine({
+Engine.start({
   // ...
   onGoTo: ({ game, afterGoTo }) => {
     afterGoTo(() => {
@@ -860,7 +846,7 @@ const newGame = new Engine({
     });
   },
   // ...
-}).start();
+});
 ```
 
 ```css
@@ -912,7 +898,7 @@ const reportExits = (game) => {
   game.print(`Exits are: ${exitList}.`);
 };
 
-const myGame = new Engine({
+Engine.start({
   entities: [pub, cellar, kitchen],
   // List exits when visiting location
   onGoTo: ({ game, afterGoTo }) => {
@@ -929,8 +915,6 @@ const myGame = new Engine({
     }
   }
 });
-
-myGame.start();
 ```
 
 ```text
@@ -991,11 +975,9 @@ const darkPlace = () => ({
   }
 });
 
-const newGame = new Engine({
+Engine.start({
   entities: [warehouse, torch, basement, darkPlace]
 });
-
-newGame.start();
 ```
 
 ### Basic NPCs
@@ -1026,7 +1008,7 @@ const sharuga = () => ({
   }
 });
 
-const newGame = new Engine({
+Engine.start({
   entities: [jail, sharuga],
   commands: {
     talk: ['talk to', 'ask', 'chat with']
@@ -1045,8 +1027,6 @@ const newGame = new Engine({
     }
   }
 });
-
-newGame.start();
 ```
 
 ## API
@@ -1141,6 +1121,9 @@ const someEntity = (getThis) => {
       // An object of base commands understood by the game
       game.COMMANDS
 
+      // Clears the screen of output
+      game.clear()
+
       // Increments the turn counter
       game.doTurn()
 
@@ -1212,9 +1195,8 @@ const someEntity = (getThis) => {
   }
 };
 
-// Creating a game instance
-
-const newGame = new Engine({
+// Creating and configuring the game
+Engine.start({
   // Array of game entity functions (NOT just ids!)
   entities: [someEntity],
 
@@ -1290,14 +1272,12 @@ const newGame = new Engine({
     // ...
   }
 });
-
-// Begin the game.
-newGame.start();
 ```
 
 ## TODO
 
 - [ ] Bug: 'me' not recognizable as noun (compromise config issue)
+- [x] Refactor to non-class architecture
 - [ ] Proper game.end() behaviour
 - [ ] game.pause()
 - [ ] 'wait' command
@@ -1305,3 +1285,5 @@ newGame.start();
 - [ ] 'and' + other separator usage
 - [ ] Command history + clear
 - [ ] Utility functions (rnd in array, print list, etc)
+- [x] Configurable DOM elements
+- [ ] Configurable message overrides

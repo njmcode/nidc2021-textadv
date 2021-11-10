@@ -31,7 +31,6 @@ const kitchen = () => ({
   }
 });
 
-const myGame = new Engine({
+Engine.start({
   entities: [pub, cellar, kitchen]
 });
-myGame.start();
