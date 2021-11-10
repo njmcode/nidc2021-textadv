@@ -1121,6 +1121,9 @@ const someEntity = (getThis) => {
       // An object of base commands understood by the game
       game.COMMANDS
 
+      // Clears the screen of output
+      game.clear()
+
       // Increments the turn counter
       game.doTurn()
 
@@ -1274,7 +1277,7 @@ Engine.start({
 ## TODO
 
 - [ ] Bug: 'me' not recognizable as noun (compromise config issue)
-- [ ] Refactor to non-class architecture
+- [x] Refactor to non-class architecture
 - [ ] Proper game.end() behaviour
 - [ ] game.pause()
 - [ ] 'wait' command
@@ -1282,5 +1285,5 @@ Engine.start({
 - [ ] 'and' + other separator usage
 - [ ] Command history + clear
 - [ ] Utility functions (rnd in array, print list, etc)
-- [ ] Configurable DOM elements
+- [x] Configurable DOM elements
 - [ ] Configurable message overrides
