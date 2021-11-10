@@ -15,24 +15,25 @@ const start = (config) => {
 
   const gameMessages = { ...MESSAGES };
 
-  let gameState;
-
-  const startGame = () => {
-    gameState = {
-      turnCount: 0,
-      isActive: true,
-      currentLocationId: startLocationId,
-      inventory: new Set(config.startInventory || []),
-      lastSubject: null
-    };
-
-    UI.clearOutput();
+  const gameState = {
+    turnCount: 0,
+    isActive: true,
+    currentLocationId: startLocationId,
+    inventory: new Set(config.startInventory || []),
+    lastSubject: null
   };
+
+  let afterCommandCallback;
+  let shouldUpdateTurn;
 
   const API = {
     ALIASES: aliases,
 
     COMMANDS: commands,
+
+    clear() {
+      UI.clearOutput();
+    },
 
     doTurn() {
       gameState.turnCount += 1;
@@ -54,8 +55,47 @@ const start = (config) => {
       return entities[id];
     },
 
-    goTo(entityId, skipTurn = false) {
+    goTo(locationId, skipTurn = false) {
+      const destination = API.entity(locationId);
 
+      let shouldStopChange = false;
+      let afterLocationChangeCallback = null;
+
+      const stopGoTo = () => {
+        shouldStopChange = true;
+      };
+
+      const afterGoTo = (cb) => {
+        afterLocationChangeCallback = cb;
+      };
+
+      if (typeof config.onGoTo === 'function') {
+        config.onGoTo({
+          game: API, destination, stopGoTo, afterGoTo
+        });
+      }
+
+      // FIXME: turn tracking may not be intuitive here
+
+      if (!gameState.isActive || shouldStopChange) return;
+
+      if (typeof destination.onGoTo === 'function') {
+        destination.onGoTo({
+          game: API, stopGoTo, afterGoTo
+        });
+      }
+
+      if (!gameState.isActive || shouldStopChange) return;
+
+      gameState.currentLocationId = locationId;
+      API.location.meta.visitCount += 1;
+      API.look();
+
+      if (!skipTurn) API.doTurn();
+
+      if (typeof afterLocationChangeCallback === 'function') {
+        afterLocationChangeCallback();
+      }
     },
 
     get inventory() {
@@ -85,7 +125,7 @@ const start = (config) => {
           );
 
         if (isFullLook) {
-          // Print any 'initial' for
+          // Print any 'initial' entries for
           // unmolested items on full LOOK
           const specialInitialEnts = visibleEnts.filter(
             (i) => i.meta.isInitialState && i.initial
@@ -112,6 +152,10 @@ const start = (config) => {
 
     MESSAGES: gameMessages,
 
+    noTurn() {
+      shouldUpdateTurn = false;
+    },
+
     print(outputText, cssClass) {
       if (!outputText) return;
 
@@ -131,313 +175,216 @@ const start = (config) => {
     TAGS
   };
 
-  class Engine {
-    constructor() {
-      UI.onSubmit((inputText) => {
-        if (!gameState.isActive) return;
-        if (!inputText) return;
+  const parseInput = (inputText) => {
+    // Get verbs and nouns from input
+    const parsed = nlp(inputText);
 
-        API.print(inputText, 'input');
-        UI.clearInput();
+    const verb = parsed.verbs().out('array')[0];
+    const noun = parsed.nouns().out('array')[0];
 
-        this.afterCommand = null;
-        this.shouldUpdateTurn = true;
-
-        this.parse(inputText.toLowerCase());
-
-        if (!gameState.isActive) return;
-
-        if (typeof this.afterCommand === 'function') {
-          this.afterCommand();
-          this.afterCommand = null;
-        }
-
-        if (!gameState.isActive) return;
-
-        if (this.shouldUpdateTurn) {
-          gameState.turnCount += 1;
-          if (typeof config.onTurn === 'function') {
-            config.onTurn({ game: this, turnCount: gameState.turnCount });
-          }
-        }
-      });
+    // Get base command
+    if (!(verb in baseCommandMap)) {
+      API.print(gameMessages.FAIL_UNKNOWN);
+      API.noTurn();
+      return;
     }
+    const baseCommand = baseCommandMap[verb];
 
-    start = () => {
-      console.log('Starting...');
+    // Get subject
+    const subject = getSubject(
+      noun,
+      [API.location.things, API.inventory],
+      (i) => !i.tags.has(TAGS.INVISIBLE)
+    );
 
-      startGame();
+    // Handle custom commands first
+    if (typeof config.onCommand === 'function') {
+      let shouldStopCommand = false;
 
-      // temp instance ref until we can clean up the public API
-      this.state = gameState;
-      this.afterCommand = null;
-
-      // Trigger any state logic in the first location
-      this.goTo(gameState.currentLocationId, true);
-
-      return this;
-    };
-
-    // eslint-disable-next-line class-methods-use-this
-    get location() {
-      return API.location;
-    }
-
-    // eslint-disable-next-line class-methods-use-this
-    get inventory() {
-      return API.inventory;
-    }
-
-    // eslint-disable-next-line class-methods-use-this
-    look = (forceFullDescription = false) => {
-      API.look(forceFullDescription);
-    };
-
-    // eslint-disable-next-line class-methods-use-this
-    dyntext = (text) => API.dyntext(text);
-
-    // eslint-disable-next-line class-methods-use-this
-    print = (outputText, cssClass) => {
-      API.print(outputText, cssClass);
-    };
-
-    // eslint-disable-next-line class-methods-use-this
-    entity = (id) => API.entity(id);
-
-    // eslint-disable-next-line class-methods-use-this
-    doTurn = () => {
-      API.doTurn();
-    };
-
-    parse = (inputText) => {
-      const parsed = nlp(inputText);
-
-      const verb = parsed.verbs().out('array')[0];
-      const noun = parsed.nouns().out('array')[0];
-
-      const noTurn = () => {
-        this.shouldUpdateTurn = false;
+      const stopCommand = (suppressTurn = false) => {
+        shouldStopCommand = true;
+        if (suppressTurn) API.noTurn();
       };
 
-      if (!(verb in baseCommandMap)) {
-        API.print(gameMessages.FAIL_UNKNOWN);
-        noTurn();
+      const afterCommand = (cb) => { afterCommandCallback = cb; };
+
+      const command = Object.keys(commands).reduce((obj, k) => {
+        obj[k] = baseCommand === k;
+        return obj;
+      }, {});
+      command._base = baseCommand;
+
+      config.onCommand({
+        command,
+        subject: subject || { is: () => false, exists: false },
+        game: API,
+        stopCommand,
+        afterCommand,
+        noTurn: API.noTurn
+      });
+
+      if (shouldStopCommand) return;
+    }
+
+    if (!gameState.isActive) return;
+
+    // Handle location connections
+    if (API.location.to && baseCommand in API.location.to) {
+      API.goTo(API.location.to[baseCommand]);
+      return;
+    }
+
+    // Built-in command handling
+    switch (baseCommand) {
+      case commands.n:
+      case commands.s:
+      case commands.e:
+      case commands.w:
+      case commands.up:
+      case commands.down:
+      case commands.in:
+      case commands.out: {
+        // Fall-through if earlier logic fails
+        API.print(gameMessages.FAIL_NO_EXIT);
         return;
       }
 
-      const baseCommand = baseCommandMap[verb];
-
-      // Build list of potential subjects from:
-      // - Current location 'has'
-      // - Player inventory
-
-      const subject = getSubject(
-        noun,
-        [API.location.things, API.inventory],
-        (i) => !i.tags.has(TAGS.INVISIBLE)
-      );
-
-      if (typeof config.onCommand === 'function') {
-        let shouldStopCommand = false;
-
-        const stopCommand = (suppressTurn = false) => {
-          shouldStopCommand = true;
-          if (suppressTurn) noTurn();
-        };
-
-        const afterCommand = (cb) => { this.afterCommand = cb; };
-
-        const command = Object.keys(commands).reduce((obj, k) => {
-          obj[k] = baseCommand === k;
-          return obj;
-        }, {});
-        command._base = baseCommand;
-
-        config.onCommand({
-          command,
-          subject: subject || { is: () => false, exists: false },
-          game: this,
-          stopCommand,
-          afterCommand,
-          noTurn
-        });
-        if (shouldStopCommand) return;
-      }
-
-      if (!gameState.isActive) return;
-
-      if (API.location.to && baseCommand in API.location.to) {
-        this.goTo(API.location.to[baseCommand]);
+      case commands.look: {
+        API.look(true);
+        API.noTurn();
         return;
       }
 
-      switch (baseCommand) {
-        case commands.n:
-        case commands.s:
-        case commands.e:
-        case commands.w:
-        case commands.up:
-        case commands.down:
-        case commands.in:
-        case commands.out: {
-          if (!API.location.to || !(baseCommand in API.location.to)) {
-            API.print(gameMessages.FAIL_NO_EXIT);
-            return;
-          }
-
-          API.goTo(API.location.to[baseCommand]);
+      case commands.examine: {
+        if (!subject) {
+          API.print(gameMessages.FAIL_EXAMINE);
+          API.noTurn();
           return;
         }
 
-        case commands.look: {
-          API.look(true);
-          noTurn();
-          return;
-        }
+        API.print(subject.description);
+        subject.meta.isExamined = true;
+        return;
+      }
 
-        case commands.examine: {
-          if (!subject) {
-            API.print(gameMessages.FAIL_EXAMINE);
-            noTurn();
-            return;
-          }
-
-          API.print(subject.description);
-          subject.meta.isExamined = true;
-          return;
-        }
-
-        case commands.get: {
-          if (
-            !subject
+      case commands.get: {
+        if (
+          !subject
             || subject.tags.has(TAGS.SCENERY)
             || subject.tags.has(TAGS.FIXED)
-          ) {
-            API.print(gameMessages.FAIL_GET);
-            noTurn();
-            return;
-          }
-
-          if (API.inventory.has(subject.id)) {
-            API.print(gameMessages.FAIL_GET_OWNED);
-            noTurn();
-            return;
-          }
-
-          API.location.things.delete(subject.id);
-          API.inventory.add(subject.id);
-          subject.meta.isInitialState = false;
-          API.print(gameMessages.OK_GET);
+        ) {
+          API.print(gameMessages.FAIL_GET);
+          API.noTurn();
           return;
         }
 
-        case commands.drop: {
-          if (!subject || !API.inventory.has(subject.id)) {
-            API.print(gameMessages.FAIL_DROP_OWNED);
-            noTurn();
-            return;
-          }
-
-          if (subject.tags.has(TAGS.FIXED)) {
-            API.print(gameMessages.FAIL_DROP);
-            noTurn();
-            return;
-          }
-
-          API.inventory.delete(subject.id);
-          API.location.things.add(subject.id);
-          subject.meta.isInitialState = false;
-          API.print(gameMessages.OK_DROP);
+        if (API.inventory.has(subject.id)) {
+          API.print(gameMessages.FAIL_GET_OWNED);
+          API.noTurn();
           return;
         }
 
-        case commands.inventory: {
-          if (API.inventory.size === 0) {
-            API.print(gameMessages.INV_NONE);
-            noTurn();
-            return;
-          }
+        API.location.things.delete(subject.id);
+        API.inventory.add(subject.id);
+        subject.meta.isInitialState = false;
 
-          const invText = [...API.inventory]
-            .map((i) => entities[i])
-            .filter(
-              (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
-            )
-            .map((i) => API.dyntext(i.summary))
-            .join(', ');
+        API.print(gameMessages.OK_GET);
+        return;
+      }
 
-          API.print(`${gameMessages.INV_PREFIX}${invText}.`);
-          noTurn();
+      case commands.drop: {
+        if (!subject || !API.inventory.has(subject.id)) {
+          API.print(gameMessages.FAIL_DROP_OWNED);
+          API.noTurn();
           return;
         }
 
-        case commands.help: {
-          API.print(
-            `Basic commands: ${Object.values(commands).join(
-              ', '
-            )}. Try other words too!`,
-            'info'
-          );
-          noTurn();
+        if (subject.tags.has(TAGS.FIXED)) {
+          API.print(gameMessages.FAIL_DROP);
+          API.noTurn();
           return;
         }
 
-        default: {
-          API.print(gameMessages.FAIL_UNHANDLED);
-          noTurn();
+        API.inventory.delete(subject.id);
+        API.location.things.add(subject.id);
+        subject.meta.isInitialState = false;
+
+        API.print(gameMessages.OK_DROP);
+        return;
+      }
+
+      case commands.inventory: {
+        if (API.inventory.size === 0) {
+          API.print(gameMessages.INV_NONE);
+          API.noTurn();
+          return;
         }
-      }
-    };
 
-    goTo = (locationId, skipTurn = false) => {
-      const destination = API.entity(locationId);
+        const invText = [...API.inventory]
+          .map((i) => entities[i])
+          .filter(
+            (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
+          )
+          .map((i) => API.dyntext(i.summary))
+          .join(', ');
 
-      let _shouldStopChange = false;
-      let _afterLocationChangeCallback = null;
-
-      const stopGoTo = () => {
-        _shouldStopChange = true;
-      };
-
-      const afterGoTo = (cb) => {
-        _afterLocationChangeCallback = cb;
-      };
-
-      if (typeof config.onGoTo === 'function') {
-        config.onGoTo({
-          game: this, destination, stopGoTo, afterGoTo
-        });
+        API.print(`${gameMessages.INV_PREFIX}${invText}.`);
+        API.noTurn();
+        return;
       }
 
-      // FIXME: turn tracking may not be intuitive here
-
-      if (!gameState.isActive || _shouldStopChange) return;
-
-      if (typeof destination.onGoTo === 'function') {
-        destination.onGoTo({
-          game: this, stopGoTo, afterGoTo
-        });
+      case commands.help: {
+        API.print(
+          `Basic commands: ${Object.values(commands).join(
+            ', '
+          )}. Try other words too!`,
+          'info'
+        );
+        API.noTurn();
+        return;
       }
 
-      if (!gameState.isActive || _shouldStopChange) return;
-
-      gameState.currentLocationId = locationId;
-      API.location.meta.visitCount += 1;
-      API.look();
-      if (!skipTurn) API.doTurn();
-
-      if (typeof _afterLocationChangeCallback === 'function') {
-        _afterLocationChangeCallback();
+      default: {
+        API.print(gameMessages.FAIL_UNHANDLED);
+        API.noTurn();
       }
-    };
-
-    // eslint-disable-next-line class-methods-use-this
-    end() {
-      API.end();
     }
-  }
+  };
 
-  return new Engine().start();
+  // Setup input-parse-output loop
+  UI.onSubmit((inputText) => {
+    if (!inputText) return;
+    if (!gameState.isActive) return;
+
+    afterCommandCallback = null;
+    shouldUpdateTurn = true;
+
+    API.print(inputText, 'input');
+    UI.clearInput();
+
+    parseInput(inputText.toLowerCase());
+
+    if (!gameState.isActive) return;
+
+    if (typeof afterCommandCallback === 'function') {
+      afterCommandCallback();
+      afterCommandCallback = null;
+    }
+
+    if (!gameState.isActive) return;
+
+    if (shouldUpdateTurn) {
+      API.doTurn();
+
+      if (typeof config.onTurn === 'function') {
+        config.onTurn({ game: API, turnCount: gameState.turnCount });
+      }
+    }
+  });
+
+  // Start the game
+  UI.clearOutput();
+  API.goTo(gameState.currentLocationId, true);
 };
 
 export default {

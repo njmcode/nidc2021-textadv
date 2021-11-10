@@ -46,8 +46,6 @@ const setupEntities = (config) => {
     return obj;
   }, {});
 
-  console.log('baseNounMap', baseNounMap);
-
   nlp.extend((_Doc, world) => {
     const extraNouns = Object.keys(baseNounMap).reduce((obj, k) => {
       obj[k] = 'Noun';
