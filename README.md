@@ -1115,7 +1115,7 @@ const someEntity = (getThis) => {
     // Locations will trigger this callback every time,
     // *just before* they are visited via navigation
     // or game.goTo().
-    onGoTo: ({ game, stopChange, afterChange }) => {
+    onGoTo: ({ game, stopGoTo, afterGoTo }) => {
       // 'game' is the game instance
 
       // Aliases (synonyms) for the base COMMANDS
@@ -1290,3 +1290,4 @@ Engine.start({
 - [ ] Utility functions (rnd in array, print list, etc)
 - [x] Configurable DOM elements
 - [ ] Configurable message overrides
+- [ ] Per-location onTurn + onCommand handling
