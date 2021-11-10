@@ -2,20 +2,9 @@
   "name": "nidc-2021-textadv",
   "version": "1.0.0",
   "description": "",
-  "targets": {
-    "lib": {
-      "distDir": "lib",
-      "outputFormat": "esmodule",
-      "optimize": true
-    },
-    "example": {
-      "distDir": "dist"
-    }
-  },
   "scripts": {
-    "watch": "parcel watch --target lib src/index.js",
-    "build": "parcel build --target lib src/index.js",
-    "serve:example": "parcel serve --target example src/example/index.html",
+    "build:lib": "microbundle -i src/index.js -o lib/index.js",
+    "serve:example": "parcel serve example/index.html",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "njmcode",
@@ -29,6 +18,7 @@
     "eslint": "^8.1.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.25.2",
+    "microbundle": "^0.14.1",
     "parcel": "^2.0.0"
   },
   "dependencies": {

@@ -58,12 +58,15 @@ This project's goal is to make JavaScript-centric text game authoring (a little)
 
 This project requires [Node](https://nodejs.org) v12.18 or later.
 
+Using the library externally of this repo requires `compromise` as a dependency.
+
 - Clone the repo.
 - From the repo root, `npm install`.
-- Run `npm run serve:example` then visit `localhost:1234` to see the example game running
-- Edit the example at `src/example`. Changes are watched, and will refresh the browser when saved.
+- Run `npm run serve:example` then visit `localhost:1234` to see the example game running.
+- Edit the example at `/example`. Changes are watched, and will refresh the browser when saved.
+- Code for the library is in `/src`. Running `npm run build:lib` will build the library in various formats to `/lib`.
 
-The project is written in vanilla JavaScript and HTML, with modular architecture and SCSS support via [`parceljs`](https://parceljs.org/).
+The project is written in vanilla JavaScript and HTML, with modular architecture and SCSS support via [`parceljs`](https://parceljs.org/). Library module bundling courtesy of [`microbundle`](https://github.com/developit/microbundle).
 
 ## Game commands
 
