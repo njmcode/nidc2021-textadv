@@ -1,14 +1,13 @@
 /* eslint-disable no-param-reassign */
-import uiHelper from './ui';
 import setupCommands from './commands';
 import setupEntities from './entities';
 import MESSAGES from './messages';
+import uiHelper from './ui';
+import queueHelper from './queue';
 import TAGS from './tags';
 import parse from './parse';
 
 const start = (config) => {
-  const UI = uiHelper();
-
   const {
     commands, aliases, baseCommandMap
   } = setupCommands(config);
@@ -23,6 +22,9 @@ const start = (config) => {
     inventory: new Set(config.startInventory || []),
     lastSubject: null
   };
+
+  const UI = uiHelper();
+  const Queue = queueHelper({ UI, gameState });
 
   let afterCommandCallback;
   let shouldUpdateTurn;
@@ -157,6 +159,12 @@ const start = (config) => {
       shouldUpdateTurn = false;
     },
 
+    pause(pauseTime = 0) {
+      // TODO: add indefinite pause + 'continue' option
+      UI.hideInput();
+      Queue.add({ pauseTime });
+    },
+
     print(outputText, cssClass) {
       if (!outputText) return;
 
@@ -165,8 +173,7 @@ const start = (config) => {
         return;
       }
 
-      UI.writeOutput(API.dyntext(outputText), cssClass);
-      UI.scrollToBottom();
+      Queue.add({ outputText: API.dyntext(outputText), cssClass });
     },
 
     get state() {
