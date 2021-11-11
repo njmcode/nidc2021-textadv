@@ -55,6 +55,7 @@ const driveway = () => ({
     'The front wall of the house leads east to the porch.'
   ],
   tags: ['outdoors'],
+  things: ['car', 'jack'],
   to: {
     e: 'front',
     n: 'garage',
