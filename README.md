@@ -1,6 +1,6 @@
 # nidc-2021-textadv
 
-**A JavaScript library for text parser games and interactive fiction.**
+**A lightweight JavaScript library for text parser games and interactive fiction.**
 
 Heavily inspred by [_Graphic Adventure Creator_](https://en.wikipedia.org/wiki/_Graphic_Adventure_Creator_), [_Inform7_](http://inform7.com/), and more.
 
@@ -469,14 +469,14 @@ const lab = () => ({
   things: ['redButton', 'blueButton']
 });
 
-const redButton = ({
+const redButton = () => ({
   id: 'redButton',
   nouns: ['red', 'red button'],
   description: 'A red button. A label above reads DO NOT PRESS.',
   tags: ['scenery']
 });
 
-const blueButton = ({
+const blueButton = () => ({
   id: 'blueButton',
   nouns: ['blue', 'blue button'],
   description: 'A blue button. Nothing special.',
@@ -1173,6 +1173,10 @@ const someEntity = (getThis) => {
       // An object of game message consts
       game.MESSAGES
 
+      // Stops any game input/output for the given
+      // duration, in ms
+      game.pause(pauseTime);
+
       // Output game text
       game.print(textFuncOrArray, cssClass)
 
@@ -1282,7 +1286,7 @@ Engine.start({
 - [ ] Bug: 'me' not recognizable as noun (compromise config issue)
 - [x] Refactor to non-class architecture
 - [ ] Proper game.end() behaviour
-- [ ] game.pause()
+- [x] game.pause()
 - [ ] 'wait' command
 - [ ] 'it' usage
 - [ ] 'and' + other separator usage
@@ -1290,3 +1294,4 @@ Engine.start({
 - [ ] Utility functions (rnd in array, print list, etc)
 - [x] Configurable DOM elements
 - [ ] Configurable message overrides
+- [ ] Per-location onCommand?
