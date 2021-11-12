@@ -1,14 +1,19 @@
 /* eslint-disable no-param-reassign */
-import uiHelper from './ui';
 import setupCommands from './commands';
 import setupEntities from './entities';
 import MESSAGES from './messages';
+import uiHelper from './ui';
+import queueHelper from './queue';
+import {
+  getVisibleEntities,
+  getEntitiesWithInitial,
+  getSummaryListText
+} from './helpers';
+import { arrayExclude } from './utils';
 import TAGS from './tags';
 import parse from './parse';
 
 const start = (config) => {
-  const UI = uiHelper();
-
   const {
     commands, aliases, baseCommandMap
   } = setupCommands(config);
@@ -23,6 +28,9 @@ const start = (config) => {
     inventory: new Set(config.startInventory || []),
     lastSubject: null
   };
+
+  const UI = uiHelper();
+  const Queue = queueHelper({ UI, gameState });
 
   let afterCommandCallback;
   let shouldUpdateTurn;
@@ -108,53 +116,48 @@ const start = (config) => {
     },
 
     look(forceFullDescription = false) {
-      const isFullLook = forceFullDescription || API.location.meta.visitCount === 1;
+      const loc = API.location;
+      const isFullLook = forceFullDescription || loc.meta.visitCount === 1;
+
+      API.print(isFullLook ? loc.description : loc.summary);
+
+      if (loc.things.size === 0) return;
+
+      let visibleEnts = getVisibleEntities(loc, entities);
 
       if (isFullLook) {
-        API.print(API.location.description);
-      } else {
-        API.print(API.location.summary);
-      }
+        // Print any 'initial' entries for
+        // unmolested items on full LOOK
+        const entsWithInitial = getEntitiesWithInitial(visibleEnts);
 
-      if (API.location.things.size > 0) {
-        let visibleEnts = [...API.location.things]
-          .map((h) => entities[h])
-          .filter(
-            (i) => !i.tags.has(TAGS.INVISIBLE)
-              && !i.tags.has(TAGS.SCENERY)
-              && !i.tags.has(TAGS.SILENT)
-          );
+        if (entsWithInitial.length > 0) {
+          entsWithInitial.forEach((i) => {
+            API.print(i.initial);
+          });
 
-        if (isFullLook) {
-          // Print any 'initial' entries for
-          // unmolested items on full LOOK
-          const specialInitialEnts = visibleEnts.filter(
-            (i) => i.meta.isInitialState && i.initial
-          );
-
-          if (specialInitialEnts.length > 0) {
-            specialInitialEnts.forEach((i) => {
-              API.print(i.initial);
-            });
-          }
-
-          visibleEnts = visibleEnts.filter((i) => !specialInitialEnts.includes(i));
-        }
-
-        if (visibleEnts.length > 0) {
-          const listText = `${
-            gameMessages.LOCATION_ITEMS_PREFIX
-          }${visibleEnts.map((i) => API.dyntext(i.summary)).join(', ')}.`;
-
-          API.print(listText);
+          visibleEnts = arrayExclude(visibleEnts, entsWithInitial);
         }
       }
+
+      if (visibleEnts.length === 0) return;
+
+      const listText = `${
+        gameMessages.LOCATION_ITEMS_PREFIX
+      }${getSummaryListText(visibleEnts, API)}.`;
+
+      API.print(listText);
     },
 
     MESSAGES: gameMessages,
 
     noTurn() {
       shouldUpdateTurn = false;
+    },
+
+    pause(pauseTime = 0) {
+      // TODO: add indefinite pause + 'continue' option
+      UI.hideInput();
+      Queue.add({ pauseTime });
     },
 
     print(outputText, cssClass) {
@@ -165,8 +168,7 @@ const start = (config) => {
         return;
       }
 
-      UI.writeOutput(API.dyntext(outputText), cssClass);
-      UI.scrollToBottom();
+      Queue.add({ outputText: API.dyntext(outputText), cssClass });
     },
 
     get state() {
@@ -213,12 +215,12 @@ const start = (config) => {
 
     if (!gameState.isActive) return;
 
-    if (shouldUpdateTurn) {
-      API.doTurn();
+    if (!shouldUpdateTurn) return;
 
-      if (typeof config.onTurn === 'function') {
-        config.onTurn({ game: API, turnCount: gameState.turnCount });
-      }
+    API.doTurn();
+
+    if (typeof config.onTurn === 'function') {
+      config.onTurn({ game: API, turnCount: gameState.turnCount });
     }
   });
 

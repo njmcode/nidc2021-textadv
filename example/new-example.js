@@ -112,7 +112,7 @@ const wirecutters = () => ({
 Engine.start({
   entities: [basement, door, bomb, wire, debris, crowbar, storage, toolbox, wirecutters],
   commands: {
-    pull: ['pull', 'remove', 'tamper', 'disconnect', 'yank', 'tear'],
+    pull: ['pull', 'pull out', 'remove', 'tamper with', 'disconnect', 'yank', 'tear'],
     defuse: ['defuse', 'stop', 'disarm', 'disable'],
     cut: ['cut', 'snip', 'sever'],
     force: ['force', 'open', 'force open', 'pry open', 'pry', 'jam', 'hit', 'kick', 'kick down', 'break', 'break down', 'smash', 'break']
@@ -161,9 +161,12 @@ Engine.start({
 
     // Handle lack of finesse
     if (command.pull && subject.is('wire')) {
+      game.print('You pull out the wire.');
+      game.pause(2000);
+      game.print('You breathe a sigh of relief.');
+      game.pause(2000);
       game.print([
-        'You pull out the wire.',
-        'There is a moment of relief, before the bomb explodes, obliterating everything around it... including you.',
+        '...before the bomb explodes, obliterating everything around it... including you.',
         `${ct('salmon', 'Game Over.')}`
       ]);
       game.end();
@@ -185,8 +188,9 @@ Engine.start({
     // Cut the wire
     if (command.cut && subject.is('wire')) {
       if (game.inventory.has('wirecutters')) {
+        game.print('You snip the wire.');
+        game.pause((Math.random() * 3) * 1000);
         game.print([
-          'You snip the wire.',
           `...The timer stops at ${game.entity('bomb').data.remaining}!`,
           `${ct('lightgreen', 'Well done!')}`
         ]);

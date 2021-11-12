@@ -4,7 +4,9 @@
   "description": "",
   "scripts": {
     "build:lib": "microbundle -i src/index.js -o lib/index.js",
+    "watch:lib": "microbundle watch -i src/index.js -o lib/index.js",
     "serve:example": "parcel serve example/index.html",
+    "clear": "rm -rf dist/*",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "njmcode",

@@ -1,6 +1,8 @@
 /* eslint-disable no-param-reassign */
 import nlp from 'compromise';
+import { isSubjectGettable, getListableInventory, getSummaryListText } from './helpers';
 import TAGS from './tags';
+import { arrayToObject } from './utils';
 
 const parse = ({
   inputText,
@@ -44,12 +46,13 @@ const parse = ({
       if (suppressTurn) API.noTurn();
     };
 
-    const command = Object.keys(commands).reduce((obj, k) => {
-      obj[k] = baseCommand === k;
-      return obj;
-    }, {});
+    const command = arrayToObject(
+      Object.keys(commands),
+      (_obj, k) => baseCommand === k
+    );
     command._base = baseCommand;
 
+    // Pass authoring tools to custom command callback
     config.onCommand({
       command,
       subject: subject || { is: () => false, exists: false },
@@ -104,11 +107,7 @@ const parse = ({
     }
 
     case commands.get: {
-      if (
-        !subject
-          || subject.tags.has(TAGS.SCENERY)
-          || subject.tags.has(TAGS.FIXED)
-      ) {
+      if (!isSubjectGettable(subject)) {
         API.print(gameMessages.FAIL_GET);
         API.noTurn();
         return;
@@ -156,13 +155,8 @@ const parse = ({
         return;
       }
 
-      const invText = [...API.inventory]
-        .map((i) => entities[i])
-        .filter(
-          (i) => !i.tags.has(TAGS.INVISIBLE) && !i.tags.has(TAGS.SILENT)
-        )
-        .map((i) => API.dyntext(i.summary))
-        .join(', ');
+      const invItems = getListableInventory(entities, API);
+      const invText = getSummaryListText(invItems, API);
 
       API.print(`${gameMessages.INV_PREFIX}${invText}.`);
       API.noTurn();
