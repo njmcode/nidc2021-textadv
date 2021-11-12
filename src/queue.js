@@ -1,3 +1,14 @@
+// Basic queue setup for handling game output.
+// add() pushes items onto the queue.
+//
+// If the item is for printing text,
+// it will be immediately flushed and printed.
+// { outputText cssClass }
+//
+// If the item is for pausing the game,
+// it will prevent any further output until
+// the time has passed.
+// { pauseTime }
 const queueHelper = ({ UI, gameState }) => {
   const outputQueue = [];
   let isFlushing = false;

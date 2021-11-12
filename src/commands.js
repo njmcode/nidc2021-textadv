@@ -1,5 +1,6 @@
 /* eslint-disable no-param-reassign */
 import nlp from 'compromise';
+import { arrayToObject } from './utils';
 
 const COMMANDS = {
   n: 'n',
@@ -54,6 +55,7 @@ const setupCommands = (config) => {
   const commands = { ...COMMANDS };
   const aliases = { ...ALIASES };
 
+  // Add custom commands and aliases to our lists
   if (config.commands) {
     Object.entries(config.commands).forEach(([cmd, aliasList]) => {
       commands[cmd] = cmd;
@@ -61,27 +63,27 @@ const setupCommands = (config) => {
     });
   }
 
-  const baseCommandMap = Object.entries(aliases).reduce(
-    (obj, [baseCmd, aliasList]) => {
-      obj[baseCmd] = baseCmd;
-      aliasList.forEach((alias) => { obj[alias] = baseCmd; });
-      return obj;
-    },
-    {}
+  // For every command alias, create a map entry
+  // pointing to the base command for that alias
+  // (e.g. { 'get':'get', 'take':'get', 'pick up':'get' })
+  const baseCommandMap = arrayToObject(
+    Object.keys(aliases),
+    (obj, k) => {
+      aliases[k].forEach((alias) => { obj[alias] = k; });
+      return k;
+    }
   );
 
-  // Let compromise know about our new verbs
+  // Let compromise know about our new commands
   nlp.extend((_Doc, world) => {
-    // Blow away the NLP built-in dict
-    // TODO: surely there's a way to use it?
-
+    // TODO: fix collisions with existing verbs that are
+    // defined as something else (e.g. 'me')
     // world.words = {};
 
-    const ext = Object.keys(baseCommandMap).reduce((obj, k) => {
-      obj[k] = 'Verb';
-      return obj;
-    }, {});
-
+    const ext = arrayToObject(
+      Object.keys(baseCommandMap),
+      () => 'Verb'
+    );
     world.addWords(ext);
   });
 

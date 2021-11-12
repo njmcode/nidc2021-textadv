@@ -1,3 +1,5 @@
+import { arrayToObject } from './utils';
+
 const defaultSelectors = {
   inputForm: '.game-input',
   inputField: '.game-typed-input',
@@ -12,14 +14,16 @@ const UI = (selectors = {}) => {
     ...selectors
   };
 
-  const els = Object.entries(sels).reduce((obj, [k, s]) => {
-    const el = document.querySelector(s);
-    if (!el) throw new Error(`No DOM element found for selector: ${s}`);
-
-    // eslint-disable-next-line no-param-reassign
-    obj[k] = el;
-    return obj;
-  }, {});
+  // Cache references to DOM elements for the game UI
+  const els = arrayToObject(
+    Object.keys(sels),
+    (obj, k) => {
+      const s = sels[k];
+      const el = document.querySelector(s);
+      if (!el) throw new Error(`No DOM element found for selector: ${s}`);
+      return el;
+    }
+  );
 
   const getInput = () => els.inputField.value.trim();
 
