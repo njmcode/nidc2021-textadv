@@ -8,7 +8,7 @@ const ct = (color, text) => `<span style="color:${color};">${text}</span>`;
 
 const bomb = (getThis) => ({
   id: 'bomb',
-  nouns: ['bomb', 'time bomb', 'explosives'],
+  nouns: ['bomb', 'time bomb', 'explosives', 'counter'],
   tags: ['scenery'],
   description: [
     'A large pack of explosives with a wire attached to a timer. It is counting down!',
@@ -40,6 +40,11 @@ const basement = () => ({
         '---'
       ], 'info');
     }
+  },
+  onLook: ({ game, afterLook }) => {
+    afterLook(() => {
+      game.print('The bomb counter is active.');
+    });
   }
 });
 
@@ -189,7 +194,7 @@ Engine.start({
     if (command.cut && subject.is('wire')) {
       if (game.inventory.has('wirecutters')) {
         game.print('You snip the wire.');
-        game.pause((Math.random() * 3) * 1000);
+        game.pause(1000 + ((Math.random() * 3) * 1000));
         game.print([
           `...The timer stops at ${game.entity('bomb').data.remaining}!`,
           `${ct('lightgreen', 'Well done!')}`
