@@ -41,10 +41,8 @@ const basement = () => ({
       ], 'info');
     }
   },
-  onLook: ({ game, afterLook }) => {
-    afterLook(() => {
-      game.print('The bomb counter is active.');
-    });
+  onLook: ({ game }) => () => {
+    game.print('The bomb counter is active.');
   }
 });
 
@@ -91,12 +89,13 @@ const storage = () => ({
     w: 'basement',
     out: 'basement'
   },
-  onGoTo: ({ game, stopGoTo }) => {
+  onGoTo: ({ game }) => {
     // Can't enter here while door is sealed
     if (game.entity('door').data.isSealed) {
       game.print("The door won't budge!");
-      stopGoTo();
+      return false;
     }
+    return true;
   }
 });
 
@@ -138,30 +137,30 @@ Engine.start({
     }
   },
   onCommand: ({
-    game, command, subject, stopCommand, afterCommand
+    game, command, subject
   }) => {
     if (command.examine) {
       // Find crowbar in debris
       if (subject.is('debris') && !subject.meta.isExamined) {
-        afterCommand(() => {
+        return () => {
           game.print('Sifting through the rubble, you uncover a rusty crowbar.');
           game.location.things.add('crowbar');
-        });
+        };
       }
 
       // Find cutters in toolbox
       if (subject.is('toolbox') && !subject.meta.isExamined) {
-        afterCommand(() => {
+        return () => {
           game.print('As you inspect the tool case, something falls out to the floor.');
           game.location.things.add('wirecutters');
-        });
+        };
       }
     }
 
     // Handle generic solutions
     if (command.defuse && (subject.is('bomb') || subject.is('wire'))) {
       game.print('How are you going to do that?');
-      stopCommand();
+      return false;
     }
 
     // Handle lack of finesse
@@ -187,7 +186,7 @@ Engine.start({
       } else {
         game.print("It's stuck. You'll need something to force it open with.");
       }
-      stopCommand();
+      return false;
     }
 
     // Cut the wire
@@ -203,7 +202,9 @@ Engine.start({
       } else {
         game.print('You will need some kind of tool to cut it.');
       }
-      stopCommand();
+      return false;
     }
+
+    return true;
   }
 });

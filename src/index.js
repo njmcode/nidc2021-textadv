@@ -67,34 +67,25 @@ const start = (config) => {
     goTo(locationId, skipTurn = false) {
       const destination = API.entity(locationId);
 
-      let shouldStopChange = false;
-      let afterLocationChangeCallback = null;
-
-      const stopGoTo = () => {
-        shouldStopChange = true;
-      };
-
-      const afterGoTo = (cb) => {
-        afterLocationChangeCallback = cb;
-      };
+      let onGoToResult = true;
 
       if (typeof config.onGoTo === 'function') {
-        config.onGoTo({
-          game: API, destination, stopGoTo, afterGoTo
+        onGoToResult = config.onGoTo({
+          game: API, destination
         });
       }
 
       // FIXME: turn tracking may not be intuitive here
 
-      if (!gameState.isActive || shouldStopChange) return;
+      if (onGoToResult === false || !gameState.isActive) return;
 
       if (typeof destination.onGoTo === 'function') {
-        destination.onGoTo({
-          game: API, stopGoTo, afterGoTo
+        onGoToResult = destination.onGoTo({
+          game: API
         });
       }
 
-      if (!gameState.isActive || shouldStopChange) return;
+      if (onGoToResult === false || !gameState.isActive) return;
 
       gameState.currentLocationId = locationId;
       API.location.meta.visitCount += 1;
@@ -102,8 +93,8 @@ const start = (config) => {
 
       if (!skipTurn) API.doTurn();
 
-      if (typeof afterLocationChangeCallback === 'function') {
-        afterLocationChangeCallback();
+      if (typeof onGoToResult === 'function') {
+        onGoToResult();
       }
     },
 
@@ -119,34 +110,27 @@ const start = (config) => {
       const loc = API.location;
       const isFullLook = forceFullDescription || loc.meta.visitCount === 1;
 
-      let afterLookCallback = null;
-      let shouldStopLook = false;
-
-      const afterLook = (cb) => { afterLookCallback = cb; };
-      const stopLook = () => { shouldStopLook = true; };
+      let onLookResult = true;
 
       const lookCallbacks = [config.onLook, loc.onLook];
 
       for (let i = 0; i < 2; i++) {
         const fn = lookCallbacks[i];
         if (typeof fn === 'function') {
-          fn({
+          onLookResult = fn({
             game: API,
-            isFullLook,
-            stopLook,
-            afterLook
+            isFullLook
           });
 
-          if (shouldStopLook || !gameState.isActive) return;
+          if (onLookResult === false || !gameState.isActive) return;
         }
       }
 
       API.print(isFullLook ? loc.description : loc.summary);
 
       if (loc.things.size === 0) {
-        if (typeof afterLookCallback === 'function') {
-          afterLookCallback();
-          afterLookCallback = null;
+        if (typeof onLookResult === 'function') {
+          onLookResult();
         }
         return;
       }
@@ -168,9 +152,8 @@ const start = (config) => {
       }
 
       if (visibleEnts.length === 0) {
-        if (typeof afterLookCallback === 'function') {
-          afterLookCallback();
-          afterLookCallback = null;
+        if (typeof onLookResult === 'function') {
+          onLookResult();
         }
         return;
       }
@@ -181,9 +164,8 @@ const start = (config) => {
 
       API.print(listText);
 
-      if (typeof afterLookCallback === 'function') {
-        afterLookCallback();
-        afterLookCallback = null;
+      if (typeof onLookResult === 'function') {
+        onLookResult();
       }
     },
 

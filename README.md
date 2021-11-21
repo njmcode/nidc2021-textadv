@@ -70,7 +70,7 @@ The project is written in vanilla JavaScript and HTML, with modular architecture
 
 ## Game commands
 
-`N`,`S`,`E`,`W`,`UP`,`DOWN`,`IN`, and `OUT` move to available locations.
+`N`, `S`, `E`, `W`, `UP`, `DOWN`, `IN`, and `OUT` move to available locations.
 
 `GET` and `DROP` handle inventory items; `INVENTORY` lists what you're carrying. `EXAMINE` describes items and nearby scenery. Try abbreviations like `INV` and `EX` (or even `X`) too.
 
@@ -82,9 +82,11 @@ The project is written in vanilla JavaScript and HTML, with modular architecture
 
 ## About entities
 
-The game engine is based on **entities**. An entity might represent a location, an inventory item, a piece of scenery, and more.
+The game engine is based on **entities**. An entity represents a location, an inventory item, a piece of scenery, etc.
 
-To create an entity, write a plain JavaScript function that returns an object, then pass it to the game engine via the `entities` array option.
+An entity is simply a plain JavaScript function that returns an object.
+
+Entities are passed to the game engine via the `start()` command.
 
 ```javascript
 const someEntity = () => ({
@@ -102,13 +104,13 @@ Engine.start({
 
 ## Creating the game map
 
-Entities can be connected together to create a game world that the player can explore.
+Entities connect together to create the game world.
 
-Create connections by adding a `to` object to an entity, specifying the commands used for navigation and the `id`s of the locations to visit.
+An entity's `to` object describes which entities it is connected to.
 
-By default, the game will use the first item of the `entities` array as the start location. This can be overridden with the `startLocationId` option.
+The first entity given to the game engine is the starting location, unless overridden by the `startLocationId` option.
 
-Re-visiting a location will print the `summary` for brevity. The `LOOK` command will print the full `description` again.
+First-time visits to an entity (or using the `LOOK` command) use its `description`. Subsequent visits use its `summary` for brevity.
 
 ```javascript
 const pub = () => ({
@@ -166,9 +168,9 @@ A cosy pub.
 
 ## Adding scenery
 
-Entities can be used to provide additional descriptive text and other flavour for a location.
+Entities can provide additional text and flavour for a location.
 
-To define scenery, add `'scenery'` to an entity's `tags` array, and provide `nouns` for the player to refer to it in-game. The entity's `id` can then be placed in the `things` array of one or more locations.
+Add `'scenery'` to an entity's `tags` array, and provide `nouns` for the player to refer to it in-game. The entity's `id` can then be used in the `things` array of one or more locations.
 
 A scenery entity is silent unless `EXAMINE`d, at which point its `description` is printed. It will not respond to commands such as `GET` etc.
 
@@ -202,13 +204,15 @@ The frame is exquisitely carved, while the bedclothes are made of the finest lin
 
 ## Adding items
 
-Entities can be treated as inventory items that the player can pick up.
+Entities can be treated as items for the player to collect and use.
 
 Provide a `nouns` array for the item, to help the player refer to it in-game. Then add its `id` to the `things` array of a location.
 
-The game will report the item's presence when describing the location, using its `summary`. If `initial` is defined on the item, the game will print it instead of 'You can see...' for this item, _provided_ the item has not been picked up or moved by the player.
+The game reports `You can see...` when describing the location, using the item's `summary`.
 
-The player can then manipulate the item with commands such as `GET` and `DROP`. If the item is `EXAMINE`d, its `description` is printed.
+If `initial` is defined on the item, the game prints it instead, if the item has not been picked up or moved by the player.
+
+The item responds to `GET` and `DROP` commands. If the item is `EXAMINE`d, its `description` is printed.
 
 The player can start the game with an item if its `id` is included in the `startInventory` option.
 
@@ -271,11 +275,13 @@ You can see a tankard.
 
 ## Usable items and other game logic
 
-The engine has no built-in commands or logic for making items useful. However, the author can easily define their own commands, logic, puzzles, and traps using the engine.
+The engine has no built-in commands for using items, but authors can easily add their own, along with logic for how items behave.
 
 ### Location triggers
 
-A simple example is to make something happen if the player enters a location in possession of a certain item. A location's `onGoTo` callback can be used to perform logic when the player moves around.
+Something may happen if the player enters a location while holding a certain item.
+
+A location's `onGoTo` callback can be used for this purpose.
 
 ```javascript
 const entryway = () => ({
@@ -302,10 +308,10 @@ const temple = () => ({
   to: {
     s: 'entryway'
   },
-  onGoTo: ({ game, afterGoTo }) => {
-    // Using the afterGoTo callback lets the
-    // location describe itself as normal first
-    afterGoTo(() => {
+  onGoTo: ({ game }) => {
+    // Returning this function lets the game
+    // describe the location as normal first.
+    return () => {
       // 'Kill' the player if they enter the
       // temple while not holding the idol
       if (!game.inventory.has('idol')) {
@@ -313,7 +319,7 @@ const temple = () => ({
 
         game.end();
       }
-    });
+    };
   }
 });
 
@@ -351,9 +357,13 @@ The floor crumbles beneath you, sending you crashing to the bottom of a deep pit
 
 ### Locks and keys
 
-Another common puzzle in adventure games is a simple locked door. We must stop the player moving through the door if it is locked, and provide a means for it to be unlocked.
+Locked doors are a staple of adventure games.
 
-Authors can define a global `onCommand` callback which will fire whenever the player attempts a valid action. Depending on our needs, we can prevent the action from happening. We can also create our own commands using the `commands` option. Lastly, we can define custom entity data for use in our logic.
+The global `onCommand` callback is fired whenever the player attempts a valid action, and can prevent the action from happening.
+
+Custom commands are possible with the `commands` option.
+
+Lastly, custom entity `data` can be used for game logic.
 
 ```javascript
 // Location with boolean data for lock status
@@ -362,6 +372,7 @@ const hallway = () => ({
   summary: 'A hallway.',
   description: 'You are in a hallway. A red door is south.',
   things: ['key'],
+  // State for the locked door
   data: {
     isDoorLocked: true
   },
@@ -393,14 +404,14 @@ Engine.start({
   commands: {
     unlock: ['unlock', 'open', 'access']
   },
-  onCommand: ({ game, command, stopCommand }) => {
+  onCommand: ({ game, command }) => {
     if (game.location.is('hallway')) {
       // Block the player if the door is locked
       if (command.s && game.location.data.isDoorLocked) {
         game.print('The door is locked.');
 
         // Stop the 's' command from executing
-        stopCommand();
+        return false;
       }
 
       // Handle unlocking with the key
@@ -417,11 +428,8 @@ Engine.start({
           game.print('It is already unlocked.');
         }
 
-        // Without a 'stopCommand()' call, the engine
-        // will think our 'unlock' command is invalid
-        // and print an error. We may want this sometimes,
-        // but not here in the 'hallway' location.
-        stopCommand();
+        // Prevent the 'bad command' message
+        return false;
       }
     }
   }
@@ -459,7 +467,7 @@ A small, cramped apartment. The exit is north.
 
 ### Which thing?
 
-We may wish to know which entity a command acted upon, if any (e.g. for `GET`, `EXAMINE`, etc). The `onCommand` callback also exposes this via the `subject` object.
+The `onCommand` callback exposes the `subject` entity of commands such as `GET`, `EXAMINE`, etc.
 
 ```javascript
 const lab = () => ({
@@ -488,17 +496,17 @@ Engine.start({
   commands: {
     push: ['push', 'press', 'hit', 'activate']
   },
-  onCommand: ({ game, command, subject, stopCommand }) => {
+  onCommand: ({ game, command, subject }) => {
     if (command.push) {
-      if (subject.exists && subject.is('redButton')) {
+      if (subject.is('redButton')) {
         game.print('The entire lab explodes in a white-hot ball of fire. Nothing can survive - including you.');
         game.end();
       } else {
         game.print('Nothing appears to happen.');
       }
 
-      // Prevent 'bad input' messages
-      stopCommand();
+      // Prevent the 'bad command' message
+      return false;
     }
   }
 });
@@ -528,7 +536,11 @@ The entire lab explodes in a white-hot ball of fire. Nothing can survive - inclu
 
 ### Adding and removing things
 
-Authors can also add and remove items from entities (and the player's inventory) in-game - useful for 'discovering' items, consumables, etc. The `afterCommand` callback will be executed after the default command's behaviour, and may be useful here.
+Entities can be added and removed to locations (and the player's inventory) via game logic.
+
+This allows for 'discovering' items, using consumables, etc.
+
+If the `onCommand` callback returns a function, that function is executed after the command's default behaviour.
 
 ```javascript
 const library = () => ({
@@ -558,19 +570,20 @@ const key = () => ({
 Engine.start({
   entities: [library, book, key],
   onCommand: ({
-    game, command, subject, afterCommand
+    game, command, subject
   }) => {
     if (
       command.examine
-      && subject.exists && subject.is('book')
+      && subject.is('book')
       && subject.data.hasKey
     ) {
-      // Lets the default EXAMINE behaviour happen first
-      afterCommand(() => {
+      // This function will execute after the
+      // normal EXAMINE behaviour.
+      return () => {
         game.print('As you open the book, something falls out, clattering to the floor.');
         subject.data.hasKey = false;
         game.location.things.add('key');
-      });
+      };
     }
   }
 });
@@ -601,9 +614,11 @@ Taken.
 
 ## Dynamic text
 
-Entity `summary` and `description` text, and other text passed to the engine's `print()` function, can be more than simple strings. This will allow for text that changes depending on the state of the game.
+Text used for `summary`, `description` and other `print()` commands can be more than simple strings.
 
-Entity functions are passed an optional parameter (named `getThis` below). This parameter can be called as a function to get a reference to the entity in-game.
+Using a function instead allows for dynamic text that uses game and entity state.
+
+Entity declaration functions receive a function as an optional parameter. When called, it returns a reference to the entity itself.
 
 ```javascript
 // Data-driven item description
@@ -639,7 +654,7 @@ const shrine = () => ({
 });
 ```
 
-As a convenience, these text elements may also be defined as arrays. The engine will print one paragraph for each item in the array, if it exists.
+As a convenience, these text elements may also be defined as arrays. The engine prints one paragraph for each item in the array, if the item exists.
 
 ```javascript
 const dungeon = () => ({
@@ -650,7 +665,7 @@ const dungeon = () => ({
     'It is dark.',
     'Damp.',
     'And cold.',
-    // Engine won't output null or empty strings
+    // Engine won't output null, undefined, or empty strings
     (game) => (game.inventory.has('whiskey') ? 'At least you have booze.' : null)
   ]
 });
@@ -694,8 +709,8 @@ Sorry, that's not possible.
 // LOOKing and checking INVENTORY, won't count as a turn,
 // nor will invalid or mis-spelled commands.
 
-// We can use the global onTurn callback and custom entity data to
-// set up timed events.
+// We can use the global onTurn callback and custom entity
+// data to set up timed events.
 const timeBomb = (getThis) => ({
   id: 'timeBomb',
   nouns: ['bomb', 'time bomb', 'explosives'],
@@ -843,10 +858,11 @@ As good-looking as ever.
 
 Engine.start({
   // ...
-  onGoTo: ({ game, afterGoTo }) => {
-    afterGoTo(() => {
+  onGoTo: ({ game }) => {
+    // Set <body> tag data attribute once we arrive at our location
+    return () => {
       document.querySelector('body').dataset.location = game.location.id;
-    });
+    };
   },
   // ...
 });
@@ -892,9 +908,9 @@ const kitchen = () => ({
 
 Engine.start({
   entities: [pub, cellar, kitchen],
-  onLook: ({ game, afterLook }) => {
-    // Lets the normal location description be printed first.
-    afterLook(() => {
+  onLook: ({ game }) => {
+    // Will execute after the normal LOOK behaviour
+    return () => {
       if (!game.location.to) return;
 
       // List all 'to' commands in the current location
@@ -903,7 +919,7 @@ Engine.start({
         .join(', ');
 
       game.print(`Exits are: ${exitList}.`);
-    });
+    };
   }
 });
 ```
@@ -942,7 +958,7 @@ const basement = () => ({
   to: {
     up: 'warehouse'
   },
-  onGoTo: ({ game, stopGoTo }) => {
+  onGoTo: ({ game }) => {
     // Teleport the player to the dark place if they try
     // to enter the basement without a light source
     const hasLight = (
@@ -952,7 +968,7 @@ const basement = () => ({
 
     if (!hasLight) {
       game.goTo('darkPlace');
-      stopGoTo();
+      return false; // stop navigation to this entity
     }
   }
 });
@@ -1005,7 +1021,7 @@ Engine.start({
     talk: ['talk to', 'ask', 'chat with']
   },
   onCommand: ({
-    game, command, subject, stopCommand
+    game, command, subject
   }) => {
     // Make any entity with data.quotes say
     // something random when asked
@@ -1014,7 +1030,8 @@ Engine.start({
         Math.floor(Math.random() * subject.data.quotes.length)
       ];
       game.print(`${subject.summary} says, "${rndQuote}"`);
-      stopCommand();
+      // stop 'talk' from being treated as a bad command
+      return false;
     }
   }
 });
@@ -1103,7 +1120,7 @@ const someEntity = (getThis) => {
     // Locations will trigger this callback every time,
     // *just before* they are visited via navigation
     // or game.goTo().
-    onGoTo: ({ game, stopChange, afterChange }) => {
+    onGoTo: ({ game }) => {
       // 'game' is the game instance
 
       // Aliases (synonyms) for the base COMMANDS
@@ -1174,24 +1191,23 @@ const someEntity = (getThis) => {
       // An object of tag consts
       game.TAGS
 
-      // Prevents the location change from being executed.
-      // See noTurn() below for suppressTurn behaviour.
-      stopGoTo(suppressTurn = false);
-
-      // Calls the provided function after the location
-      // change has been executed
-      afterGoTo(callbackFn);
-
       // If called, prevents the turn count from being
       // incremented and the onTurn global callback firing
       // for this location change.
       noTurn();
+
+      // Prevents the location change from being executed.
+      return false;
+
+      // Calls the provided function after the location
+      // change has been executed
+      return callbackFn;
     },
 
     // Called **just before** this location is described
     // (including the items present in it),
     // either via navigating to it, or via the LOOK command.
-    onLook: ({ game, isFullLook, stopLook, afterLook }) => {
+    onLook: ({ game, isFullLook }) => {
       // `game` is as described above in onGoTo
 
       // true if the location is about to be fully described
@@ -1200,11 +1216,11 @@ const someEntity = (getThis) => {
 
       // Prevents the location and its items from being
       // described at all.
-      stopLook();
+      return false;
 
       // Calls the provided function after the location and
       // its items have been described
-      afterLook(callbackFn);
+      return callbackFn;
     }
   }
 };
@@ -1230,7 +1246,7 @@ Engine.start({
   },
 
   // Called when ANY command is successfully executed
-  onCommand: ({ game, command, subject, stopCommand, afterCommand, noTurn }) => {
+  onCommand: ({ game, command, subject, noTurn }) => {
     // 'game' is as described earlier above.
 
     // The value of the command used will be true, the rest false
@@ -1252,28 +1268,27 @@ Engine.start({
     subject.is(entityId)
     // ...
 
-    // Prevents the default command from being executed.
-    // Will stop navigation to other locations, EXAMINE descriptions,
-    // etc.
-    // Should always be called as a fallback for custom commands,
-    // to prevent them being interpreted as bad input.
-    // See noTurn() below for suppressTurn behaviour.
-    stopCommand(suppressTurn = false);
-
-    // Calls the provided function after the default command
-    // has been executed.
-    afterCommand(callbackFn);
-
     // If called, prevents the turn count from being
     // incremented and the onTurn global callback firing
     // for this command.
     noTurn();
+
+    // Prevents the default command from being executed.
+    // Will stop navigation to other locations, EXAMINE descriptions,
+    // etc.
+    // Custom commands should always fall back to returning false,
+    // to prevent them being interpreted as bad input.
+    return false;
+
+    // Calls the provided function after the default command
+    // has been executed.
+    return callbackFn;
   },
 
   // As for entity.onGoTo, but is called on *every*
   // location change, before the logic of the location
   // being moved to.
-  onGoTo: ({ game, destination, stopGoto, afterGoTo }) => {
+  onGoTo: ({ game, destination }) => {
     // 'destination' is the entity being moved to
     // ...
   },
@@ -1281,7 +1296,7 @@ Engine.start({
   // As for entity.onLook, but is called on *every*
   // description of a location, before the logic of
   // the location itsef.
-  onLook: ({ game, isFullLook, stopLook, afterLook }) => {
+  onLook: ({ game, isFullLook }) => {
     // ...
   },
 
@@ -1308,5 +1323,4 @@ Engine.start({
 - [ ] Utility functions (rnd in array, print list, etc)
 - [x] Configurable DOM elements
 - [ ] Configurable message overrides
-- [ ] Per-location onCommand?
 - [x] Dedicated onLook callbacks

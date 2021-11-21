@@ -39,12 +39,7 @@ const parse = ({
 
   // Handle custom commands first
   if (typeof config.onCommand === 'function') {
-    let shouldStopCommand = false;
-
-    const stopCommand = (suppressTurn = false) => {
-      shouldStopCommand = true;
-      if (suppressTurn) API.noTurn();
-    };
+    let onCommandResult = true;
 
     const command = arrayToObject(
       Object.keys(commands),
@@ -53,19 +48,19 @@ const parse = ({
     command._base = baseCommand;
 
     // Pass authoring tools to custom command callback
-    config.onCommand({
+    onCommandResult = config.onCommand({
       command,
       subject: subject || { is: () => false, exists: false },
       game: API,
-      stopCommand,
-      afterCommand,
       noTurn: API.noTurn
     });
 
-    if (shouldStopCommand) return;
-  }
+    if (onCommandResult === false || !gameState.isActive) return;
 
-  if (!gameState.isActive) return;
+    if (typeof onCommandResult === 'function') {
+      afterCommand(onCommandResult);
+    }
+  }
 
   // Handle location connections
   if (API.location.to && baseCommand in API.location.to) {
