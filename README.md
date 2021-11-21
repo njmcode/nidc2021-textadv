@@ -870,6 +870,7 @@ body[data-location="field"] {
 
 ```javascript
 // Less-evocative, but more convenient exit descriptions
+// using the global onLook() callback
 
 const pub = () => ({
   id: 'pub',
@@ -889,33 +890,20 @@ const kitchen = () => ({
   // ...
 });
 
-// Utility function to list all 'to' commands
-// in the current location
-const reportExits = (game) => {
-  if (!game.location.to) return;
-
-  const exitList = Object.keys(game.location.to)
-    .map((k) => k.toUpperCase())
-    .join(', ');
-
-  game.print(`Exits are: ${exitList}.`);
-};
-
 Engine.start({
   entities: [pub, cellar, kitchen],
-  // List exits when visiting location
-  onGoTo: ({ game, afterGoTo }) => {
-    afterGoto(() => {
-      reportExits(game);
+  onLook: ({ game, afterLook }) => {
+    // Lets the normal location description be printed first.
+    afterLook(() => {
+      if (!game.location.to) return;
+
+      // List all 'to' commands in the current location
+      const exitList = Object.keys(game.location.to)
+        .map((k) => k.toUpperCase())
+        .join(', ');
+
+      game.print(`Exits are: ${exitList}.`);
     });
-  },
-  // List exits when LOOKing
-  onCommand: ({ game, command, afterCommand }) => {
-    if (command.look) {
-      afterCommand(() => {
-        reportExits(game)
-      });
-    }
   }
 });
 ```
@@ -1198,6 +1186,25 @@ const someEntity = (getThis) => {
       // incremented and the onTurn global callback firing
       // for this location change.
       noTurn();
+    },
+
+    // Called **just before** this location is described
+    // (including the items present in it),
+    // either via navigating to it, or via the LOOK command.
+    onLook: ({ game, isFullLook, stopLook, afterLook }) => {
+      // `game` is as described above in onGoTo
+
+      // true if the location is about to be fully described
+      // (i.e. is a first visit, or LOOK has been used)
+      isFullLook;
+
+      // Prevents the location and its items from being
+      // described at all.
+      stopLook();
+
+      // Calls the provided function after the location and
+      // its items have been described
+      afterLook(callbackFn);
     }
   }
 };
@@ -1263,19 +1270,26 @@ Engine.start({
     noTurn();
   },
 
-  // Called after every valid turn, after all commands have run
-  // and the turn count has updated. If the turn has been suppressed
-  // (see above) or an entered command does not constitute a 'turn'
-  // (e.g. HELP), this will not fire.
-  onTurn: ({ game, turnCount }) => {
-    // ...
-  },
-
   // As for entity.onGoTo, but is called on *every*
   // location change, before the logic of the location
   // being moved to.
   onGoTo: ({ game, destination, stopGoto, afterGoTo }) => {
     // 'destination' is the entity being moved to
+    // ...
+  },
+
+  // As for entity.onLook, but is called on *every*
+  // description of a location, before the logic of
+  // the location itsef.
+  onLook: ({ game, isFullLook, stopLook, afterLook }) => {
+    // ...
+  },
+
+  // Called after every valid turn, after all commands have run
+  // and the turn count has updated. If the turn has been suppressed
+  // (see above) or an entered command does not constitute a 'turn'
+  // (e.g. HELP), this will not fire.
+  onTurn: ({ game, turnCount }) => {
     // ...
   }
 });
@@ -1295,3 +1309,4 @@ Engine.start({
 - [x] Configurable DOM elements
 - [ ] Configurable message overrides
 - [ ] Per-location onCommand?
+- [x] Dedicated onLook callbacks

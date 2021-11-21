@@ -119,9 +119,37 @@ const start = (config) => {
       const loc = API.location;
       const isFullLook = forceFullDescription || loc.meta.visitCount === 1;
 
+      let afterLookCallback = null;
+      let shouldStopLook = false;
+
+      const afterLook = (cb) => { afterLookCallback = cb; };
+      const stopLook = () => { shouldStopLook = true; };
+
+      const lookCallbacks = [config.onLook, loc.onLook];
+
+      for (let i = 0; i < 2; i++) {
+        const fn = lookCallbacks[i];
+        if (typeof fn === 'function') {
+          fn({
+            game: API,
+            isFullLook,
+            stopLook,
+            afterLook
+          });
+
+          if (shouldStopLook || !gameState.isActive) return;
+        }
+      }
+
       API.print(isFullLook ? loc.description : loc.summary);
 
-      if (loc.things.size === 0) return;
+      if (loc.things.size === 0) {
+        if (typeof afterLookCallback === 'function') {
+          afterLookCallback();
+          afterLookCallback = null;
+        }
+        return;
+      }
 
       let visibleEnts = getVisibleEntities(loc, entities);
 
@@ -139,13 +167,24 @@ const start = (config) => {
         }
       }
 
-      if (visibleEnts.length === 0) return;
+      if (visibleEnts.length === 0) {
+        if (typeof afterLookCallback === 'function') {
+          afterLookCallback();
+          afterLookCallback = null;
+        }
+        return;
+      }
 
       const listText = `${
         gameMessages.LOCATION_ITEMS_PREFIX
       }${getSummaryListText(visibleEnts, API)}.`;
 
       API.print(listText);
+
+      if (typeof afterLookCallback === 'function') {
+        afterLookCallback();
+        afterLookCallback = null;
+      }
     },
 
     MESSAGES: gameMessages,
