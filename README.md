@@ -170,9 +170,9 @@ A cosy pub.
 
 Entities can provide additional text and flavour for a location.
 
-Add `'scenery'` to an entity's `tags` array, and provide `nouns` for the player to refer to it in-game. The entity's `id` can then be used in the `things` array of one or more locations.
+Provide `nouns` so the entity can be referred to in-game. Then add its `id` to the `things` array of one or more locations.
 
-A scenery entity is silent unless `EXAMINE`d, at which point its `description` is printed. It will not respond to commands such as `GET` etc.
+An entity added in this way is silent unless `EXAMINE`d, at which point its `description` is printed.
 
 ```javascript
 // Location
@@ -187,7 +187,6 @@ const bedroom = () => ({
 const bed = () => ({
   id: 'bed',
   nouns: ['bed', 'four-poster bed'],
-  tags: ['scenery'],
   description: 'The frame is exquisitely carved, while the bedclothes are made of the finest linen.'
 });
 
@@ -206,7 +205,7 @@ The frame is exquisitely carved, while the bedclothes are made of the finest lin
 
 Entities can be treated as items for the player to collect and use.
 
-Provide a `nouns` array for the item, to help the player refer to it in-game. Then add its `id` to the `things` array of a location.
+Add the `item` tag to the entity, and provide a `nouns` array to help the player refer to it in-game. Then add its `id` to the `things` array of a location.
 
 The game reports `You can see...` when describing the location, using the item's `summary`.
 
@@ -224,6 +223,7 @@ For making items usable, see the following section.
 // Item entity
 const tankard = () => ({
   id: 'tankard',
+  tags: ['item'],
   nouns: ['tankard', 'drink', 'mug'],
   summary: 'a tankard',
   initial: 'There is a drinking tankard perched on the bar.',
@@ -296,6 +296,7 @@ const entryway = () => ({
 
 const idol = () => ({
   id: 'idol',
+  tags: ['item'],
   nouns: ['idol', 'statue', 'totem'],
   summary: 'a small statue',
   description: 'The statue is well-worn, but radiates a calming, protective aura.'
@@ -393,6 +394,7 @@ const apartment = () => ({
 // Key item
 const key = () => ({
   id: 'key',
+  tags: ['item'],
   nouns: ['key', 'door key'],
   summary: 'a key',
   description: 'A simple door key.'
@@ -480,15 +482,13 @@ const lab = () => ({
 const redButton = () => ({
   id: 'redButton',
   nouns: ['red', 'red button'],
-  description: 'A red button. A label above reads DO NOT PRESS.',
-  tags: ['scenery']
+  description: 'A red button. A label above reads DO NOT PRESS.'
 });
 
 const blueButton = () => ({
   id: 'blueButton',
   nouns: ['blue', 'blue button'],
-  description: 'A blue button. Nothing special.',
-  tags: ['scenery']
+  description: 'A blue button. Nothing special.'
 });
 
 Engine.start({
@@ -552,6 +552,7 @@ const library = () => ({
 
 const book = () => ({
   id: 'book',
+  tags: ['item'],
   nouns: ['book', 'tome'],
   summary: 'a large book',
   description: 'It is leather-bound and filled with dense manuscript.',
@@ -562,6 +563,7 @@ const book = () => ({
 
 const key = () => ({
   id: 'key',
+  tags: ['item'],
   nouns: ['key', 'old key', 'iron key'],
   summary: 'an old key',
   description: 'An ancient-looking, rusted iron key.',
@@ -624,6 +626,7 @@ Entity declaration functions receive a function as an optional parameter. When c
 // Data-driven item description
 const mirror = (getThis) => ({
   id: 'mirror',
+  tags: ['item'],
   nouns: ['mirror', 'looking glass'],
   summary: 'a mirror',
   data: {
@@ -676,13 +679,14 @@ const dungeon = () => ({
 ### Un-droppable items
 
 ```javascript
-// The 'fixed' tag can prevent items from being dropped (or picked up)
+// Entities without an `item` tag can still be in
+// the player's inventory, but can not be dropped.
 const note = () => ({
   id: 'note',
   noun: ['note', 'decree', 'important note'],
-  tags: ['fixed'],
   summary: 'an important note',
   description: 'This note is of vital importance and must be kept safe!'
+  // note no `tags: ['item']` property
 });
 
 Engine.start({
@@ -714,7 +718,6 @@ Sorry, that's not possible.
 const timeBomb = (getThis) => ({
   id: 'timeBomb',
   nouns: ['bomb', 'time bomb', 'explosives'],
-  tags: ['scenery'],
   description: () => `It is wired and counting down! The counter shows the number ${getThis().data.remaining}...`,
   data: {
     remaining: 4
@@ -752,7 +755,6 @@ Engine.start({
 const moneyTracker = (getThis) => ({
   id: 'moneyTracker',
   summary: () => `${getThis().data.amount} gold coin(s)`,
-  tags: ['fixed'],
   data: {
     amount: 10 // starting amount
   }
@@ -763,6 +765,7 @@ const moneyTracker = (getThis) => ({
 // e.g. custom logic for puzzle solving, quest rewards etc.
 const coinAdder = (getThis) => ({
   id: 'coinAdder',
+  tags: ['item'],
   nouns: ['coins', 'gold coins', 'money'],
   summary: () => `${getThis().data.amount} gold coin(s)`,
   description: 'The root of all evil, some say.',
@@ -816,11 +819,11 @@ You are carrying 30 gold coin(s).
 ### 'Examine myself' / player state
 
 ```javascript
-// Entities with the 'silent' tag won't be reported in
-// location descriptions or inventory lists, but can still
-// be taken, dropped, EXAMINEd, etc.
+// Entities with no 'item' tag won't be reported in
+// location descriptions or inventory lists, but can
+// still be EXAMINEd.
 
-// We create a silent, fixed entity to act as the 'player',
+// We create a non-item entity to act as the 'player',
 // and add it to the starting inventory.
 
 // This method could also be used to track player state or
@@ -829,7 +832,6 @@ const player = () => ({
   id: 'player',
   nouns: ['myself', 'moi', 'player'],
   description: 'As good-looking as ever.',
-  tags: ['fixed', 'silent']
 });
 
 Engine.start({
@@ -946,6 +948,7 @@ const warehouse = () => ({
 
 const torch = () => ({
   id: 'torch',
+  tags: ['item'],
   nouns: ['torch', 'light', 'lantern'],
   summary: 'a torch',
   description: 'A self-powering, perpetually-lit torch. Cool!'
@@ -999,10 +1002,13 @@ const jail = () => ({
   things: ['sharuga']
 });
 
+// The 'present' tag will force a non-item
+// entity to be described as if it were one
+// (`You can see...` etc).
 const sharuga = () => ({
   id: 'sharuga',
+  tags: ['present'],
   nouns: ['sharuga', 'barbarian', 'woman', 'prisoner'],
-  tags: ['fixed'],
   summary: 'Sharuga',
   description: 'An imposing yet strangely elegant warrior woman with red facial tattoos.',
   data: {
@@ -1056,10 +1062,16 @@ const someEntity = (getThis) => {
 
     // Behaviour hints for this entity
     tags: [
-      'fixed', // Can not be picked up or dropped by player
-      'silent', // Not listed in location/inventory, but can be EXAMINEd
-      'scenery', // fixed + silent
-      'invisible' // ignored by the game engine + player commands
+      // Can not be picked up, dropped etc (override default 'item' behaviour)
+      'fixed',
+      // Ignored by the game engine + player commands, functionally non-existent
+      'invisible',
+      // Can be picked up, dropped etc (also implies 'present')
+      'item',
+      // Reported by location/inventory
+      'present',
+      // Not reported by location/inventory (override default 'item' behaviour)
+      'silent'
     ],
 
     // List of entity IDs 'contained' by this one,
@@ -1078,7 +1090,7 @@ const someEntity = (getThis) => {
     },
 
     // Description. For locations, printed on first visit and LOOK.
-    // For items and scenery, used in EXAMINE.
+    // For other entities, used in EXAMINE.
     description:
       /*
 
@@ -1103,13 +1115,14 @@ const someEntity = (getThis) => {
       ],
 
     // Summary. For locations, printed on repeat visits.
-    // For items, used in location/inventory lists.
-    // Ignored by 'scenery'.
+    // For entities with `item` or `present` tags,
+    // used for 'You can see...' reporting.
     // Follows the same rules as `description`, but
     // array usage not recommended here for items.
     summary: 'This is a summary',
 
-    // An initial description for inventory items.
+    // An initial description for entities with
+    // 'item' or 'present' tags.
     // Follows the same rules as `description`.
     // If defined, will be printed during the LOOK command
     // instead of the item being listed in 'You can see...',

@@ -1,6 +1,6 @@
 /* eslint-disable no-param-reassign */
 import nlp from 'compromise';
-import { isSubjectGettable, getListableInventory, getSummaryListText } from './helpers';
+import { isSubjectMoveable, getListableInventory, getSummaryListText } from './helpers';
 import TAGS from './tags';
 import { arrayToObject } from './utils';
 
@@ -102,7 +102,7 @@ const parse = ({
     }
 
     case commands.get: {
-      if (!isSubjectGettable(subject)) {
+      if (!isSubjectMoveable(subject)) {
         API.print(gameMessages.FAIL_GET);
         API.noTurn();
         return;
@@ -129,7 +129,7 @@ const parse = ({
         return;
       }
 
-      if (subject.tags.has(TAGS.FIXED)) {
+      if (!isSubjectMoveable(subject)) {
         API.print(gameMessages.FAIL_DROP);
         API.noTurn();
         return;
