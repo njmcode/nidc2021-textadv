@@ -9,7 +9,6 @@ const ct = (color, text) => `<span style="color:${color};">${text}</span>`;
 const bomb = (getThis) => ({
   id: 'bomb',
   nouns: ['bomb', 'time bomb', 'explosives', 'counter'],
-  tags: ['scenery'],
   description: [
     'A large pack of explosives with a wire attached to a timer. It is counting down!',
     () => `The counter shows the number ${ct('salmon', getThis().data.remaining)}...`
@@ -49,19 +48,18 @@ const basement = () => ({
 const wire = () => ({
   id: 'wire',
   nouns: ['wire', 'wires', 'bomb wire', 'red wire', 'red', 'timer'],
-  description: 'A single red wire runs between the timer and the explosive. Amateur stuff, but effective.',
-  tags: ['scenery']
+  description: 'A single red wire runs between the timer and the explosive. Amateur stuff, but effective.'
 });
 
 const debris = () => ({
   id: 'debris',
   nouns: ['debris', 'rubbish', 'rubble', 'stuff', 'floor'],
-  tags: ['scenery'],
   description: 'Broken glass, twisted rebar, smashed concrete, dust and other detritus.'
 });
 
 const crowbar = () => ({
   id: 'crowbar',
+  tags: ['item'],
   nouns: ['crowbar', 'bar', 'rusty crowbar'],
   summary: 'a crowbar',
   initial: 'There is a crowbar sticking up from amongst the debris on the floor.',
@@ -71,7 +69,6 @@ const crowbar = () => ({
 const door = (getThis) => ({
   id: 'door',
   nouns: ['door', 'sturdy door', 'east door'],
-  tags: ['scenery'],
   data: {
     isSealed: true
   },
@@ -101,6 +98,7 @@ const storage = () => ({
 
 const toolbox = () => ({
   id: 'toolbox',
+  tags: ['item'],
   nouns: ['toolbox', 'tool box', 'box', 'toolkit', 'tool case'],
   summary: 'a toolbox',
   description: 'A small metal case with a carry-handle. It is unlocked.'
@@ -108,7 +106,8 @@ const toolbox = () => ({
 
 const wirecutters = () => ({
   id: 'wirecutters',
-  nouns: ['wire cutters', 'cutters', 'pliers'],
+  tags: ['item'],
+  nouns: ['wire cutters', 'wirecutters', 'cutters', 'pliers'],
   summary: 'a pair of wire cutters',
   description: 'Probably from an electrician\'s tool box.'
 });

@@ -1,7 +1,7 @@
 export default Object.freeze({
-  SILENT: 'silent',
-  INVISIBLE: 'invisible',
   FIXED: 'fixed',
-  QUIET: 'quiet',
-  SCENERY: 'scenery'
+  INVISIBLE: 'invisible',
+  ITEM: 'item',
+  PRESENT: 'present',
+  SILENT: 'silent'
 });
