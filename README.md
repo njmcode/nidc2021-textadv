@@ -204,7 +204,7 @@ The frame is exquisitely carved, while the bedclothes are made of the finest lin
 
 ## Adding items
 
-Entities can be treated as items for the player to use.
+Entities can be treated as items for the player to collect and use.
 
 Provide a `nouns` array for the item, to help the player refer to it in-game. Then add its `id` to the `things` array of a location.
 
@@ -275,7 +275,7 @@ You can see a tankard.
 
 ## Usable items and other game logic
 
-The engine has no built-in commands for using items, but authors can easily add their own, along with logic for what items do.
+The engine has no built-in commands for using items, but authors can easily add their own, along with logic for how items behave.
 
 ### Location triggers
 
@@ -372,6 +372,7 @@ const hallway = () => ({
   summary: 'A hallway.',
   description: 'You are in a hallway. A red door is south.',
   things: ['key'],
+  // State for the locked door
   data: {
     isDoorLocked: true
   },
@@ -653,7 +654,7 @@ const shrine = () => ({
 });
 ```
 
-As a convenience, these text elements may also be defined as arrays. The prints one paragraph for each item in the array, if it exists.
+As a convenience, these text elements may also be defined as arrays. The engine prints one paragraph for each item in the array, if the item exists.
 
 ```javascript
 const dungeon = () => ({
@@ -664,7 +665,7 @@ const dungeon = () => ({
     'It is dark.',
     'Damp.',
     'And cold.',
-    // Engine won't output null or empty strings
+    // Engine won't output null, undefined, or empty strings
     (game) => (game.inventory.has('whiskey') ? 'At least you have booze.' : null)
   ]
 });
@@ -708,8 +709,8 @@ Sorry, that's not possible.
 // LOOKing and checking INVENTORY, won't count as a turn,
 // nor will invalid or mis-spelled commands.
 
-// We can use the global onTurn callback and custom entity data to
-// set up timed events.
+// We can use the global onTurn callback and custom entity
+// data to set up timed events.
 const timeBomb = (getThis) => ({
   id: 'timeBomb',
   nouns: ['bomb', 'time bomb', 'explosives'],
@@ -967,7 +968,7 @@ const basement = () => ({
 
     if (!hasLight) {
       game.goTo('darkPlace');
-      return false; // stop navigation
+      return false; // stop navigation to this entity
     }
   }
 });
