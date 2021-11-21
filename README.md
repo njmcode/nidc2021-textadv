@@ -174,7 +174,6 @@ Provide `nouns` so the entity can be referred to in-game. Then add its `id` to t
 
 An entity added in this way is silent unless `EXAMINE`d, at which point its `description` is printed.
 
-
 ```javascript
 // Location
 const bedroom = () => ({
