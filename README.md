@@ -1328,14 +1328,11 @@ Engine.start({
 ## TODO
 
 - [ ] Bug: 'me' not recognizable as noun (compromise config issue)
-- [x] Refactor to non-class architecture
+- [ ] State save and load (serlialization, data safety etc)
 - [ ] Proper game.end() behaviour
-- [x] game.pause()
 - [ ] 'wait' command
 - [ ] 'it' usage
 - [ ] 'and' + other separator usage
 - [ ] Command history + clear
 - [ ] Utility functions (rnd in array, print list, etc)
-- [x] Configurable DOM elements
 - [ ] Configurable message overrides
-- [x] Dedicated onLook callbacks
