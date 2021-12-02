@@ -4,6 +4,8 @@
 
 Heavily inspred by [_Graphic Adventure Creator_](https://en.wikipedia.org/wiki/_Graphic_Adventure_Creator_), [_Inform7_](http://inform7.com/), and more.
 
+As seen at [Northern Ireland Developer Conference 2021](https://youtu.be/1x88oL_M7O4?t=1949).
+
 ```text
 A dank dungeon. To the north is a tavern.
 You can see a rusty sword.
