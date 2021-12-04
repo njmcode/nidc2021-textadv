@@ -1,4 +1,4 @@
-# nidc-2021-textadv
+# nidc2021-textadv
 
 **A lightweight JavaScript library for text parser games and interactive fiction.**
 
